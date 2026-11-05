@@ -23,7 +23,7 @@
   #scene{position:fixed;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
 
   .layout{position:fixed;inset:0;z-index:5;pointer-events:none;
-    display:grid; grid-template-rows: auto auto 1fr auto;
+    display:grid; grid-template-rows: auto auto auto 1fr;
     padding:2vh 3.5vw 24vh; gap:1vh}
   /* bottom 22vh reserved as cat floor — DOM never puts text there */
 
@@ -72,7 +72,7 @@
   .sticky .swap.hide{opacity:0}
 
   .date{text-align:center; font-family:Patrick Hand,Caveat,cursive;
-    font-size:clamp(1rem,1.8vw,1.35rem); letter-spacing:.2em; color:#8a6a78; margin-top:auto}
+    font-size:clamp(1rem,1.8vw,1.35rem); letter-spacing:.2em; color:#8a6a78; margin-top:1.2vh; position:relative; z-index:6}
 
   /* doodle stickers (DOM, fixed, never in floor) */
   .doodle{position:fixed; z-index:4; pointer-events:none; opacity:.9}
@@ -140,8 +140,8 @@
     <div></div>
   </div>
 
-  <div></div>
   <div class="date" id="dateLine"></div>
+  <div></div>
 </div>
 
 <button id="fsBtn" type="button" aria-label="fullscreen">
