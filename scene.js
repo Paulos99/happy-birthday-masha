@@ -342,8 +342,8 @@ function buildBalloons(){
   const rib='M920 470 C890 520 950 540 930 580', rib2='M1096 466 C1126 516 1066 546 1090 590';
   const ribbon=d=>`<path d="${d}" fill="none" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#ffb6d1" stroke-width="3.5" stroke-linecap="round"/>`;
   // каждая цифра — отдельная группа (id bal2 / bal4), чтобы мягко покачиваться
-  return `<g id="bal2" filter="url(#wob)">${limb(884,420,904,560,8,'#f7c7da')}${digit(DIG_2,780,164,-5)}${star4(790,190,14,'#fff')}${bow(930,436,.72,'#ffa7c8',-8)}${ribbon(rib)}</g>`+
-         `<g id="bal4" filter="url(#wob)">${limb(1038,420,1018,560,8,'#f7c7da')}${digit(DIG_4,988,160,5)}${star4(1170,200,11,'#fff')}${star4(1130,420,9,'#fff6c8')}${bow(1086,430,.72,'#ffa7c8',8)}${ribbon(rib2)}</g>`;
+  return `<g id="bal2" filter="url(#wob)">${digit(DIG_2,780,164,-5)}${star4(790,190,14,'#fff')}</g>`+
+         `<g id="bal4" filter="url(#wob)">${digit(DIG_4,988,160,5)}${star4(1170,200,11,'#fff')}${star4(1130,420,9,'#fff6c8')}</g>`;
 }
 function scallopsHem(){
   const N=28,cx=TB.cx,cy=TB.cy+125,rx=448,ry=112;
@@ -725,17 +725,29 @@ function toAbs(x,y){ // учесть поворот холста -1.5°
   return {x:f1(cx+dx*Math.cos(a)-dy*Math.sin(a)),y:f1(cy+dx*Math.sin(a)+dy*Math.cos(a))};
 }
 
-/* ---------- фото в полароиде ---------- */
-let photoIdx=-1, photoTimer=0;
+/* ---------- фото в полароиде (ставит котик-курьер, без фейдов/дублей) ---------- */
+let photoIdx=-1;
 function setPhoto(url){
   const img=$('photoImg'); if(!img) return;
-  if(!url){ img.style.opacity=0; return; }
-  img.style.transition='opacity .6s'; img.style.opacity=0;
-  setTimeout(()=>{img.setAttribute('href',url); img.style.opacity=1;},650);
+  if(!url){ img.setAttribute('opacity','0'); img.style.opacity='0'; img.style.visibility='hidden'; return; }
+  img.style.transition='none';
+  img.setAttributeNS('http://www.w3.org/1999/xlink','href',url);
+  img.setAttribute('href',url);
+  img.setAttribute('opacity','1');
+  img.style.opacity='1';
+  img.style.visibility='visible';
 }
 function nextPhoto(){
-  const list=window.PHOTOS||[]; if(!list.length) return;
-  photoIdx=(photoIdx+1)%list.length; setPhoto(list[photoIdx]);
+  const list=window.PHOTOS||[]; if(!list.length) return null;
+  photoIdx=(photoIdx+1)%list.length; setPhoto(list[photoIdx]); return list[photoIdx];
+}
+function peekNextPhoto(){
+  const list=window.PHOTOS||[]; if(!list.length) return null;
+  return list[(photoIdx+1)%list.length];
+}
+function currentPhoto(){
+  const list=window.PHOTOS||[]; if(!list.length||photoIdx<0) return null;
+  return list[photoIdx];
 }
 
 /* ---------- снег (canvas) ---------- */
@@ -794,7 +806,6 @@ function loop(now){
   if(LITE && now-lastDraw<31){ requestAnimationFrame(loop); return; }   // ~30 fps
   lastDraw=now;
   if(t0===null) t0=now; render(now-t0);
-  if(photoTimer>0 && (window.PHOTOS||[]).length && (now-photoTimer)>14000){photoTimer=now;nextPhoto();}
   requestAnimationFrame(loop);
 }
 
@@ -804,7 +815,7 @@ window.Scene={
   get lite(){return liteL;},
   candles:{ list:CANDLES, relight, extinguish, get lit(){return lit;}, get progress(){return Math.min(1,(curT-litAt)/OPT.burnMs);} },
   paintGreeting, eraseGreeting, paint:{ tip:()=>paint&&paint.tip||null, get active(){return !!paint;}, get progress(){return paint?paint.p||0:0;}, get done(){return !!(paint&&paint.done);} },
-  setPhoto, nextPhoto, snowBurst,
+  setPhoto, nextPhoto, peekNextPhoto, currentPhoto, snowBurst,
   now:()=>curT,
   step(ms){ manual=true; if(!started) init(); render(ms); }   // для детерминированных кадров (превью)
 };
@@ -955,7 +966,7 @@ function init(){
   if(started) return; started=true;
   build(); buildCandles(); fit(); fitTitle();
   if(document.fonts&&document.fonts.load){ document.fonts.load('40px "Marck Script"','Яа').then(()=>{fitTitle();}); }
-  const after=()=>{ if((window.PHOTOS||[]).length){ nextPhoto(); photoTimer=performance.now(); } };
+  const after=()=>{ /* первое фото ставит котик-курьер */ };
   if(LITE) return liteify().then(after,e=>{console.warn('lite failed',e);after();});
   after();
 }

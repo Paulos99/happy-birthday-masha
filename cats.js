@@ -66,6 +66,38 @@ function dishDraw(c,S,type){ // начало координат — центр �
   }
 }
 function carry(c,S,type,side=-1){c.save();c.translate(side*.5*S,-.3*S);dishDraw(c,S,type);c.restore();}
+/* мини-полароид, который несёт курьер — один раз на фото в offscreen canvas */
+const FRAME_CACHE=new Map();
+const FW=108,FH=138,FI=8;
+function frameCanvas(url){
+  let e=FRAME_CACHE.get(url); if(e) return e;
+  const cv=document.createElement('canvas'); cv.width=FW; cv.height=FH;
+  const g=cv.getContext('2d');
+  g.fillStyle='#3a2436'; rr(g,4,6,FW-4,FH-4,8); g.fill();
+  g.fillStyle='#fffaf2'; rr(g,0,0,FW-4,FH-6,7); g.fill();
+  g.strokeStyle=OUT; g.lineWidth=3.5; g.stroke();
+  g.fillStyle='#caa8d8'; rr(g,FI,FI,FW-4-FI*2,FW-4-FI*2,3); g.fill();
+  const cap=(window.BDAY&&BDAY.polaroidCaption)||'Люблю! ❤️';
+  g.fillStyle=OUT; g.font='bold 13px "Marck Script",cursive'; g.textAlign='center';
+  g.fillText(cap.split(' ')[0]||'Люблю!', (FW-4)/2, FW-4-FI*2+FI+18);
+  e={cv,ready:false}; FRAME_CACHE.set(url,e);
+  if(url){ const img=new Image(); img.crossOrigin='anonymous'; img.onload=()=>{
+    const ix=FI,iy=FI,iw=FW-4-FI*2,ih=iw;
+    const s=Math.max(iw/img.width,ih/img.height), sw=iw/s, sh=ih/s;
+    const sx=(img.width-sw)/2, sy=(img.height-sh)/2;
+    g.save(); g.beginPath(); rr(g,ix,iy,iw,ih,3); g.clip();
+    g.drawImage(img,sx,sy,sw,sh,ix,iy,iw,ih); g.restore();
+    g.strokeStyle=OUT; g.lineWidth=2.5; rr(g,ix,iy,iw,ih,3); g.stroke();
+    e.ready=true;
+  }; img.onerror=()=>{e.ready=true;}; img.src=url; }
+  else e.ready=true;
+  return e;
+}
+function drawFrameAt(ctx,url,x,y,scale,rot){
+  const e=frameCanvas(url); if(!e) return;
+  ctx.save(); ctx.translate(x,y); ctx.rotate(rot||0); ctx.scale(scale||1,scale||1);
+  ctx.drawImage(e.cv,-FW/2,-FH*.85); ctx.restore();
+}
 function camera(c,S,flash){
   c.save();c.translate(0,-.2*S);
   rr(c,-.26*S,-.14*S,.52*S,.3*S,S*.05);ink(c,'#4a4650',S*.035);
@@ -104,6 +136,8 @@ function drawCatLite(ctx,k){
   ctx.save(); ctx.translate(k.x,k.y+(k.hop||0)+bobY); ctx.rotate((k.rot||0)+sway); ctx.drawImage(sp.cv,-sp.ox,-sp.oy); 
   if(k.flash>0){ctx.translate(0,-.2*S);const fl=k.flash;ctx.globalAlpha=fl;ctx.fillStyle='#fffbe0';ctx.beginPath();ctx.arc(.18*S,-.1*S,S*.5*fl+S*.1,0,7);ctx.fill();}
   ctx.restore();
+  if(k.frameUrl){ const side=(k.face||1)<0?1:-1; drawFrameAt(ctx,k.frameUrl,k.x+side*.48*S,k.y-.55*S+(k.hop||0)+bobY,.92, (k.face||1)<0?.08:-.08); }
+  if(k.placeFrame){ drawFrameAt(ctx,k.placeFrame.url,k.placeFrame.x,k.placeFrame.y,k.placeFrame.s,k.placeFrame.rot); }
 }
 function drawCat(ctx,k){
   if(LITEC) return drawCatLite(ctx,k);
@@ -112,6 +146,8 @@ function drawCat(ctx,k){
   window.drawBaseCat(ctx,{x:0,y:0,scale:S,t:k.t,phase:k.phase,walkPhase:k.walk,facing:k.face});
   k.acc&&k.acc(ctx,S,k);
   ctx.restore();
+  if(k.frameUrl){ const side=(k.face||1)<0?1:-1; drawFrameAt(ctx,k.frameUrl,k.x+side*.48*S,k.y-.55*S+(k.hop||0),.95,(k.face||1)<0?.08:-.08); }
+  if(k.placeFrame){ drawFrameAt(ctx,k.placeFrame.url,k.placeFrame.x,k.placeFrame.y,k.placeFrame.s,k.placeFrame.rot); }
 }
 
 /* ---------- состояние котов ---------- */
@@ -128,16 +164,20 @@ function setup(){
   cats.lamplighter=mk('lamplighter',{acc:(c,S)=>{hat(c,S,'#ffe27a');}});
   cats.photographer=mk('photographer',{face:-1,flash:0,acc:(c,S,k)=>{hat(c,S,'#ffb3cf',.2);camera(c,S,k.flash);}});
   cats.snowCat=mk('snowCat',{face:-1,acc:(c,S,k)=>{scarf(c,S,k.t);hat(c,S,'#c9a8f0');}});
+  // курьер: выносит фото и ставит на полароид-мольберт
+  cats.courier=mk('courier',{face:-1,x:2050,y:820,scale:1.0,acc:(c,S)=>{hat(c,S,'#ffb3cf',.15);bowtie(c,S,'#e8445f');}});
+  courier={k:cats.courier,st:'wait',t0:0,lt:null,url:null,path:[],next:null,placed:false};
   const stand={A:{x:700,y:782},B:{x:1240,y:790}};
   waiters=[
     mkW(cats.waiterA,{x:a.waiterA.x,y:a.waiterA.y},[],stand.A,{x:630,y:706},['dome','plate','cheese'],1.5,0),
     mkW(cats.waiterB,{x:a.waiterB.x,y:a.waiterB.y},[{x:520,y:804}],stand.B,{x:1170,y:720},['plate','cheese','dome'],14,1)];
   Scene.options.autoRelightMs=null;
-  // зажигаем свечи вручную, а поле «фонарщик» делает это на глазах
-  nextPaintAt=2; 
+  nextPaintAt=2;
 }
-let waiters=[];
-let nextPaintAt=0, phase='idle', eraseAt=0, lampState={mode:'idle',t0:0,idx:0}, snowAt=3, photoAt=6, bubble=null;
+let waiters=[], courier=null;
+let nextPaintAt=0, phase='idle', eraseAt=0, lampState={mode:'idle',t0:0,idx:0}, snowAt=3, bubble=null;
+const EASEL_SPOT={x:1760,y:430}; // куда «ставят» рамку (центр фото в полароиде)
+const COURIER_HOME={x:2050,y:820}, COURIER_SPOT={x:1688,y:780};
 
 
 /* ---------- официанты: принести блюдо на стол, уйти, вернуться, забрать, унести ---------- */
@@ -178,6 +218,54 @@ function waiterTick(w,t){
     if(t-w.t0>3.5){w.hidden=false;k.hidden=false;w.ti=(w.ti+1)%w.types.length;w.type=w.types[w.ti];k.x=-170;k.y=w.home.y;w.holdFor=7;goto_(w,[w.home],'hold');}
   }
 }
+function courierGoto(pts,next){courier.path=pts.slice();courier.next=next;courier.st='walk';}
+function courierTick(t){
+  if(!courier) return;
+  const k=courier.k, dt=courier.lt==null?0:Math.min(.1,Math.max(0,t-courier.lt)); courier.lt=t;
+  const S=BASE*(k.scale||1);
+  k.hop=0; k.walk=null; k.hidden=!!courier.hidden; k.frameUrl=null; k.placeFrame=null;
+  const ease=p=>p*p*(3-2*p);
+  if(courier.st==='wait'){
+    k.x=COURIER_HOME.x; k.y=COURIER_HOME.y; k.hidden=true; courier.hidden=true;
+    if(t-courier.t0>=(courier.waitFor||1.2)){
+      const url=Scene.peekNextPhoto&&Scene.peekNextPhoto();
+      if(!url){courier.t0=t; return;}
+      courier.url=url; frameCanvas(url);
+      courier.hidden=false; k.hidden=false; k.x=COURIER_HOME.x; k.y=COURIER_HOME.y; k.face=-1;
+      courierGoto([{x:1860,y:800},COURIER_SPOT],'place');
+    }
+    return;
+  }
+  if(courier.st==='walk'){
+    const tg=courier.path[0], dx=tg.x-k.x, dy=tg.y-k.y, d=Math.hypot(dx,dy), step=150*dt;
+    if(d<=step){k.x=tg.x;k.y=tg.y;courier.path.shift();if(!courier.path.length){courier.st=courier.next;courier.t0=t;courier.placed=false;}}
+    else{k.x+=dx/d*step;k.y+=dy/d*step;if(Math.abs(dx)>1)k.face=dx>0?1:-1;}
+    if(courier.st==='walk'){k.walk=t*10;k.hop=0;}
+    // несёт новое фото к мольберту; унося старое — тоже
+    if(courier.next==='place'||courier.st==='place') k.frameUrl=courier.url;
+    else if(courier.next==='gone'||courier.st==='gone') k.frameUrl=courier.oldUrl||null;
+    return;
+  }
+  if(courier.st==='place'){
+    const p=Math.min(1,(t-courier.t0)/0.85), e=ease(p);
+    const hx=k.x+((k.face||1)<0?1:-1)*.48*S, hy=k.y-.55*S;
+    k.placeFrame={url:courier.url,x:hx+(EASEL_SPOT.x-hx)*e,y:hy+(EASEL_SPOT.y-hy)*e-Math.sin(e*Math.PI)*40,s:.92+.7*e,rot:(1-e)*-.08};
+    k.frameUrl=null; k.face=-1;
+    if(p>=1&&!courier.placed){
+      courier.placed=true; courier.oldUrl=Scene.currentPhoto&&Scene.currentPhoto();
+      Scene.nextPhoto(); // ровно один раз
+      courier.url=null; k.placeFrame=null;
+      // уходим, при желании уносим «старое» (визуально — копия ушедшего кадра)
+      courierGoto([{x:1860,y:800},COURIER_HOME],'gone');
+    }
+    return;
+  }
+  if(courier.st==='gone'){
+    k.hidden=true; courier.hidden=true; k.frameUrl=null; k.x=COURIER_HOME.x; k.y=COURIER_HOME.y;
+    courier.waitFor=5.5; courier.t0=t; courier.st='wait'; courier.oldUrl=null;
+  }
+}
+
 function brush(ctx,k,tip){
   const S=BASE*k.scale, sx=k.x-.5*S, sy=k.y-.32*S;
   ctx.save();ctx.lineCap='round';
@@ -220,10 +308,10 @@ function frame(T,dt){
   sn.hop=sp>0&&sp<.5?-Math.sin(sp/.5*Math.PI)*26:0; sn.rot=sp>0&&sp<.5?-.18*Math.sin(sp/.5*Math.PI):0;
   if(t>=snowAt+.25&&!sn.thrown){sn.thrown=true;Scene.snowBurst(a.snowCat.snowOrigin.x,a.snowCat.snowOrigin.y,70,-1);}
   if(t>=snowAt+.5){snowAt=t+4.5;sn.thrown=false;}
-  /* фотограф */
-  const ph=cats.photographer; const pt=t-photoAt; ph.flash=pt>0&&pt<.35?1-pt/.35:0;
-  if(pt>=.1&&!ph.shot){ph.shot=true;Scene.nextPhoto();}
-  if(pt>=.6){photoAt=t+9;ph.shot=false;}
+  /* фотограф — только позирует, фото больше не переключает */
+  const ph=cats.photographer; ph.flash=0; ph.shot=false;
+  /* курьер выносит фото на мольберт */
+  courierTick(t);
   /* художник */
   const pa=cats.painter;
   if(phase==='idle'&&t>=nextPaintAt){const g=C.paintedGreetings||['С днём рождения, Маша'];Scene.paintGreeting(g[complIdx++%g.length],7000);phase='paint';}
@@ -264,7 +352,7 @@ function frame(T,dt){
       else bubbleDraw(ctxB,bubble.text,a.compliment.bubble.x,a.compliment.bubble.y,Math.max(0,al));}}
   /* ---- передний слой ---- */
   waiters.forEach(w=>{if(w.dish){ctxF.save();ctxF.translate(w.dish.x,w.dish.y);dishDraw(ctxF,BASE,w.dish.type);ctxF.restore();}});
-  const order=['waiterA','waiterB','painter','dancer','photographer','snowCat'].sort((p,q)=>cats[p].y-cats[q].y);
+  const order=['waiterA','waiterB','painter','dancer','photographer','courier','snowCat'].filter(n=>cats[n]).sort((p,q)=>cats[p].y-cats[q].y);
   order.forEach(n=>{if(!cats[n].hidden)drawCat(ctxF,cats[n]);});
   if(phase==='paint'||phase==='erase'){const tipP=Scene.paint.tip();if(tipP)brush(ctxF,pa,tipP);}
   // ноты танцора
