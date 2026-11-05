@@ -1,0 +1,6 @@
+shot*.png
+shot.png
+overlap_report.json
+cat-lab/
+refs/
+*.log
