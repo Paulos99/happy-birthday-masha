@@ -16,7 +16,17 @@
    Пока массив пустой, кот показывает милые заглушки-рамки.
    ============================================================ */
 window.PHOTOS = [
-  // 'photos/1.jpg',
-  // 'photos/2.jpg',
-  // 'photos/3.jpg',
+  'photos/01.jpg',
+  'photos/02.jpg',
+  'photos/03.jpg',
+  'photos/04.jpg',
+  'photos/05.jpg',
+  'photos/06.jpg',
+  'photos/07.jpg',
+  'photos/08.jpg',
+  'photos/09.jpg',
+  'photos/10.jpg',
+  'photos/11.jpg',
+  'photos/12.jpg',
+  'photos/13.jpg',
 ];
