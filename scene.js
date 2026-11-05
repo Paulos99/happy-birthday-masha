@@ -581,7 +581,7 @@ function build(){
   const props=buildLamp()+buildBackBushes()+buildEasel()+buildLadder()+buildPolaroid();
   const tbl=buildTable()+buildBowFront()+buildTableItems();
   const chairs=buildChairs();
-  const date=buildDate();
+  const date="";
   const dyn=`
    <g id="twinkle">${STARS.map(([x,y,r,d,b])=>star4(f1(x),f1(y),f1(r),b?'#ffe6f2':'#fff6c8',`class="${b?'tw':'tw2'}" style="animation-delay:-${f1(d)}s"`)).join('')}</g>
    <g id="winGlows">${WIN.map(([x,y,r],i)=>`<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" fill="url(#winGlow)" class="gl" style="animation-delay:-${f1((i*.37)%2.6)}s"/>`).join('')}</g>`;
