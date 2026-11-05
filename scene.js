@@ -10,6 +10,8 @@ const C = window.BDAY || {};
 const W = 1920, H = 1080;
 const OUT = '#4a3042';            // тёмно-коричневая «маркерная» обводка
 const q = new URLSearchParams(location.search);
+const LITE = !q.has('hq') && !q.has('manual');   // по умолчанию — лёгкий режим для слабых ТВ (?hq — полное качество, как раньше)
+let liteL = null;
 
 /* ---------- утилиты ---------- */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -614,7 +616,7 @@ CANDLES.push({kind:'candelabra',x:1250,y:600,h:84,w:15,fs:1,col:'#fff5e0',sw:3.2
 CANDLES.push({kind:'tea',x:1336,y:712,h:46,w:22,fs:1,col:'#ffe6ee',sw:3.2},{kind:'tea',x:1262,y:744,h:46,w:22,fs:1,col:'#fff5e0',sw:3.2});
 let litAt=0, lit=true, extAt=-1e9;
 function buildCandles(){
-  const g=document.getElementById('candlesG');
+  const g=document.getElementById('candlesG'); if(!g) return;
   let s=`<ellipse id="tglow" cx="960" cy="640" rx="470" ry="130" fill="url(#tableGlow)"/>`;
   CANDLES.forEach((c,i)=>{
     c.phase=R()*10;
@@ -635,6 +637,7 @@ function updateCandles(T){
   const p=Math.min(1,(T-litAt)/OPT.burnMs);
   if(lit && (T-litAt)>=OPT.burnMs){ lit=false; extAt=T; }
   if(!lit && OPT.autoRelightMs!=null && T-extAt>OPT.autoRelightMs){ relight(T); }
+  if(liteL){ drawCandlesLite(T); return; }
   let nLit=0;
   CANDLES.forEach(c=>{
     const k=lit? 1-.42*p : 1-.42;
@@ -739,7 +742,7 @@ function nextPhoto(){
 const sc=document.getElementById('snow'), sx=sc.getContext('2d');
 const spr=document.createElement('canvas'); spr.width=spr.height=32;
 (function(){const g=spr.getContext('2d'),gr=g.createRadialGradient(16,16,0,16,16,16);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.45,'rgba(255,255,255,.85)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,32,32);})();
-const FL=[]; for(let i=0;i<190;i++){const z=R();FL.push({x:R()*W,y:R()*H,z,s:2.2+z*z*9,v:22+z*70,amp:10+R()*26,f:.4+R()*.9,ph:R()*6.28,dr:6+z*10,a:.5+z*.45});}
+const FL=[]; for(let i=0;i<(LITE?70:190);i++){const z=R();FL.push({x:R()*W,y:R()*H,z,s:2.2+z*z*9,v:22+z*70,amp:10+R()*26,f:.4+R()*.9,ph:R()*6.28,dr:6+z*10,a:.5+z*.45});}
 const BURST=[];
 function snowBurst(x,y,n=50,dir=1){ for(let i=0;i<n;i++) BURST.push({x,y,vx:(60+R()*260)*dir*(.4+R()),vy:-(60+R()*220),s:3+R()*7,life:1.6+R()*1.8,t:0,ph:R()*6.28}); }
 function drawSnow(T,dt){
@@ -781,12 +784,15 @@ window.SCENE_ANCHORS={
 let curT=0, lastT=0, manual=false, started=false;
 function render(T){
   const dt=Math.max(0,Math.min(100,T-lastT)); lastT=T; curT=T;
-  updateCandles(T); updatePaint(T); drawSnow(T,dt);
+  updateCandles(T); updatePaint(T); drawSnow(T,dt); if(liteL) drawTwinkle(T);
   if(window.SceneHooks&&window.SceneHooks.onFrame) window.SceneHooks.onFrame(T,dt);
 }
 let t0=null;
+let lastDraw=-1e9;
 function loop(now){
   if(manual) return;
+  if(LITE && now-lastDraw<31){ requestAnimationFrame(loop); return; }   // ~30 fps
+  lastDraw=now;
   if(t0===null) t0=now; render(now-t0);
   if(photoTimer>0 && (window.PHOTOS||[]).length && (now-photoTimer)>14000){photoTimer=now;nextPhoto();}
   requestAnimationFrame(loop);
@@ -794,13 +800,134 @@ function loop(now){
 
 window.Scene={
   svg, anchors:window.SCENE_ANCHORS, options:OPT,
-  layers:{ get back(){return $('catsBack');}, get front(){return $('catsFront');} },
+  layers:{ get back(){return liteL?liteL.back:$('catsBack');}, get front(){return liteL?liteL.front:$('catsFront');} },
+  get lite(){return liteL;},
   candles:{ list:CANDLES, relight, extinguish, get lit(){return lit;}, get progress(){return Math.min(1,(curT-litAt)/OPT.burnMs);} },
   paintGreeting, eraseGreeting, paint:{ tip:()=>paint&&paint.tip||null, get active(){return !!paint;}, get progress(){return paint?paint.p||0:0;}, get done(){return !!(paint&&paint.done);} },
   setPhoto, nextPhoto, snowBurst,
   now:()=>curT,
   step(ms){ manual=true; if(!started) init(); render(ms); }   // для детерминированных кадров (превью)
 };
+
+
+/* ============================================================
+   ЛЁГКИЙ РЕЖИМ: статичные слои один раз «запекаются» в растр (SVG→canvas),
+   вживую остаётся только то, что реально движется.
+   Разрешение — прежнее 1920×1080.
+   ============================================================ */
+async function liteFontCss(){
+  try{
+    const b64=ab=>{let r='';const u=new Uint8Array(ab);for(let i=0;i<u.length;i+=0x8000)r+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(r);};
+    const [a,b]=await Promise.all(['fonts/MarckScript-Regular.ttf','fonts/Caveat-Bold.ttf'].map(u=>fetch(u).then(r=>r.arrayBuffer())));
+    return `@font-face{font-family:'Marck Script';src:url(data:font/ttf;base64,${b64(a)})}@font-face{font-family:'Caveat';font-weight:700;src:url(data:font/ttf;base64,${b64(b)})}`;
+  }catch(e){ return ''; }
+}
+async function liteify(){
+  const fcss=await liteFontCss();
+  const defs=Array.from(svg.children).filter(e=>e.tagName==='defs').map(e=>e.outerHTML).join('');
+  const kids=Array.from(svg.children).filter(e=>e.tagName!=='defs');
+  const filt=kids.filter(e=>e.getAttribute('filter')==='url(#wob)'&&e.id!=='bal2'&&e.id!=='bal4');
+  const [gBg,gGround,gProps,gTable,gChairs,gFront]=filt;
+  const vig=kids.find(e=>e.tagName==='rect'&&(e.getAttribute('fill')||'').includes('vig'));
+  const raster=inner=>new Promise((res,rej)=>{
+    const str=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><style>${fcss}</style>${defs}${inner}</svg>`;
+    const img=new Image(); img.onload=()=>{const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d').drawImage(img,0,0);res(c);};
+    img.onerror=()=>rej(new Error('raster')); img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(str);
+  });
+  // статичные «пульсации» окон/гирлянд/фонарей запекаем с средней яркостью
+  const winG=$('winGlows'), bulbG=$('bulbGlows'), dyn=$('dynProps'), tw=$('twinkle');
+  bulbG.querySelectorAll('*').forEach(e=>e.style.opacity='');
+  const pc=gProps.cloneNode(true); const slot=pc.querySelector('#photoSlot'); if(slot) slot.remove();
+  const dynC=dyn.cloneNode(true); const pg=dynC.querySelector('#paintG'); if(pg) pg.remove();
+  const bal=['bal2','bal4'].map($);
+  const bbs=bal.map(g=>g.getBBox());
+  const balHtml=bal.map(g=>g.outerHTML);
+  const jobs=[
+    raster(gBg.outerHTML+`<g opacity=".7">${winG.innerHTML}</g>`),
+    raster(gGround.outerHTML+`<g opacity=".6">${bulbG.innerHTML}</g>`+pc.outerHTML+`<g opacity=".7">${dynC.innerHTML}</g>`),
+    raster(gTable.outerHTML), raster(gChairs.outerHTML),
+    raster(gFront.outerHTML+(vig?vig.outerHTML:'')),
+    raster(balHtml[0]), raster(balHtml[1])
+  ];
+  const [rBg,rGP,rTable,rChairs,rFront,rB2,rB4]=await Promise.all(jobs);
+  // живые узлы: фото и надпись на мольберте
+  const photoWrap=document.createElementNS('http://www.w3.org/2000/svg','g'); photoWrap.setAttribute('filter','url(#wob)');
+  const cx=POL.x+POL.w/2, cy=POL.y+POL.h/2;
+  const rotG=document.createElementNS('http://www.w3.org/2000/svg','g'); rotG.setAttribute('transform',`rotate(${POL.rot} ${cx} ${cy})`);
+  if(slot){ const live=$('photoSlot'); rotG.appendChild(live); }
+  rotG.insertAdjacentHTML('beforeend',`<rect x="${POL.phX}" y="${POL.phY}" width="${POL.phW}" height="${POL.phH}" rx="3" fill="none" stroke="${OUT}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>`);
+  photoWrap.appendChild(rotG);
+  const dynSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  dynSvg.setAttribute('viewBox',`0 0 ${W} ${H}`); dynSvg.appendChild(photoWrap);
+  const paintG=$('paintG'); dynSvg.appendChild(paintG);
+  // чистим исходный svg: остаются только defs (на них ссылаются живые узлы)
+  Array.from(svg.children).forEach(e=>{ if(e.tagName!=='defs') e.remove(); });
+  svg.setAttribute('style','position:absolute;width:0;height:0;overflow:hidden');
+  const stg=document.getElementById('stage'), snowEl=document.getElementById('snow');
+  const add=el=>{ el.classList.add('lay'); stg.insertBefore(el,snowEl); return el; };
+  const cv=(src)=>{ const c=document.createElement('canvas'); c.width=W; c.height=H; c.getContext('2d').drawImage(src,0,0); return add(c); };
+  const strip=(x,y,w,h)=>{ const c=document.createElement('canvas'); c.width=w; c.height=h; c.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px`; add(c); return c.getContext('2d'); };
+  const div=()=>add(document.createElement('div'));
+  cv(rBg);
+  const twx=strip(0,0,W,480);
+  cv(rGP);
+  add(dynSvg);
+  const back=div();
+  cv(rTable);
+  const CX0=480,CY0=420, cdx=strip(CX0,CY0,960,380);
+  cv(rChairs);
+  const front=div();
+  cv(rFront);
+  // спрайты шаров
+  const crop=(src,bb)=>{ const x0=Math.max(0,Math.floor(bb.x-40)),y0=Math.max(0,Math.floor(bb.y-40)),w=Math.min(W-x0,Math.ceil(bb.width+80)),h=Math.min(H-y0,Math.ceil(bb.height+80)); const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(src,x0,y0,w,h,0,0,w,h); return {c,x:x0,y:y0}; };
+  const bs=[crop(rB2,bbs[0]),crop(rB4,bbs[1])];
+  // спрайты свечей/свечения
+  const gl=document.createElement('canvas'); gl.width=gl.height=156; (function(){const g=gl.getContext('2d'),r=g.createRadialGradient(78,78,0,78,78,78);r.addColorStop(0,'rgba(255,210,122,.75)');r.addColorStop(.45,'rgba(255,179,90,.25)');r.addColorStop(1,'rgba(255,179,90,0)');g.fillStyle=r;g.fillRect(0,0,156,156);})();
+  const tgl=document.createElement('canvas'); tgl.width=tgl.height=128; (function(){const g=tgl.getContext('2d'),r=g.createRadialGradient(64,64,0,64,64,64);r.addColorStop(0,'rgba(255,210,122,.55)');r.addColorStop(1,'rgba(255,210,122,0)');g.fillStyle=r;g.fillRect(0,0,128,128);})();
+  // спрайты звёзд
+  const starSpr={}; const mkStar=col=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d'),r=15,x=16,y=16;const p=new Path2D(`M${x} ${y-r} Q${x+r*.12} ${y-r*.12} ${x+r} ${y} Q${x+r*.12} ${y+r*.12} ${x} ${y+r} Q${x-r*.12} ${y+r*.12} ${x-r} ${y} Q${x-r*.12} ${y-r*.12} ${x} ${y-r}Z`);g.fillStyle=col;g.fill(p);return c;};
+  starSpr.a=mkStar('#ffe6f2'); starSpr.b=mkStar('#fff6c8');
+  const tmp=document.createElement('canvas'); tmp.width=tmp.height=2; // keep
+  liteL={back,front,twx,cdx,CX0,CY0,bs,gl,tgl,starSpr,twLast:-1e9,
+    flame:new Path2D('M0 0 C-9 -9 -8 -22 0 -38 C8 -22 9 -9 0 0Z'), flame2:new Path2D('M0 -2 C-4.5 -7 -4 -14 0 -22 C4 -14 4.5 -7 0 -2Z'), smoke:new Path2D('M0 0 q9 -14 0 -28 q-9 -14 5 -30'),
+    balloons(ctx,t){
+      const P=[[7,3.4,1.4,5.3,.5,0,925,585],[7,3.9,1.4,4.7,2.2,1.7,1090,590]];
+      bs.forEach((b,i)=>{const p=P[i], dy=Math.sin(t*2*Math.PI/p[1]+p[5])*p[0], a=Math.sin(t*2*Math.PI/p[3]+p[4])*p[2]*Math.PI/180;
+        ctx.save(); ctx.translate(0,dy); ctx.translate(p[6],p[7]); ctx.rotate(a); ctx.translate(-p[6],-p[7]); ctx.drawImage(b.c,b.x,b.y); ctx.restore();});
+    }};
+}
+function drawTwinkle(T){
+  const L=liteL; if(T-L.twLast<70) return; L.twLast=T; const c=L.twx, t=T/1000;
+  c.clearRect(0,0,W,480);
+  STARS.forEach(([x,y,r,d,b])=>{ const P=b?3.2:4.7, a=.625-.375*Math.cos(2*Math.PI*(t+d)/P);
+    c.globalAlpha=a; c.drawImage(b?L.starSpr.a:L.starSpr.b,x-r,y-r,r*2,r*2); });
+  c.globalAlpha=1;
+}
+function rrPath(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function drawCandlesLite(T){
+  const L=liteL, c=L.cdx, ts=T/1000;
+  c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,960,380); c.translate(-L.CX0,-L.CY0);
+  const p=Math.min(1,(T-litAt)/OPT.burnMs);
+  const tg=lit?(.72+.1*Math.sin(ts*5)):0.12;
+  c.globalAlpha=tg; c.drawImage(L.tgl,960-470,640-130,940,260); c.globalAlpha=1;
+  CANDLES.forEach(cd=>{
+    const k=lit?1-.42*p:1-.42, h=cd.h*k, top=cd.y-h;
+    const fl=1+.13*Math.sin(ts*9+cd.phase)+.07*Math.sin(ts*17.3+cd.phase*2), rot=5*Math.sin(ts*4.1+cd.phase)+2*Math.sin(ts*11+cd.phase);
+    if(lit){ const ga=Math.min(1,(T-litAt)/500)*(.82+.18*Math.sin(ts*7+cd.phase)), R=cd.kind==='cake'?46:78;
+      c.globalAlpha=ga; c.drawImage(L.gl,cd.x-R,top-18*cd.fs-R,R*2,R*2); c.globalAlpha=1; }
+    rrPath(c,cd.x-cd.w/2,top,cd.w,h,cd.w*.3); c.fillStyle=cd.col; c.fill(); c.strokeStyle=OUT; c.lineWidth=cd.sw; c.lineJoin='round'; c.stroke();
+    c.strokeStyle='rgba(255,255,255,.7)'; c.lineWidth=cd.sw; c.lineCap='round'; c.beginPath(); c.moveTo(cd.x-cd.w/2+2,top+4); c.lineTo(cd.x-cd.w/2+2,cd.y-4); c.stroke();
+    c.strokeStyle=OUT; c.lineWidth=2.4; c.beginPath(); c.moveTo(cd.x,top); c.lineTo(cd.x,top-5); c.stroke();
+    if(lit){
+      c.save(); c.globalAlpha=Math.min(1,(T-litAt)/400); c.translate(cd.x,top-3); c.rotate(rot*Math.PI/180); c.scale(cd.fs*(1+(fl-1)*.6),cd.fs*fl);
+      c.fillStyle='#ffb347'; c.fill(L.flame); c.strokeStyle=OUT; c.lineWidth=(cd.kind==='cake'?3.4:2.6); c.stroke(L.flame);
+      c.fillStyle='#fff6c0'; c.fill(L.flame2); c.restore();
+    } else { const e=(T-extAt)/3800;
+      if(e<1){ c.save(); c.globalAlpha=.75*(1-e); c.translate(cd.x+2*Math.sin(ts*3+cd.phase),top-6-e*22); const sc=cd.fs>.7?1:.7; c.scale(sc,sc);
+        c.strokeStyle='#fff'; c.lineWidth=5; c.lineCap='round'; c.stroke(L.smoke); c.restore(); } }
+  });
+  c.globalAlpha=1;
+}
 
 /* ---------- заголовок: подгоняем по ширине ---------- */
 function fitTitle(){
@@ -828,9 +955,11 @@ function init(){
   if(started) return; started=true;
   build(); buildCandles(); fit(); fitTitle();
   if(document.fonts&&document.fonts.load){ document.fonts.load('40px "Marck Script"','Яа').then(()=>{fitTitle();}); }
-  if((window.PHOTOS||[]).length){ nextPhoto(); photoTimer=performance.now(); }
+  const after=()=>{ if((window.PHOTOS||[]).length){ nextPhoto(); photoTimer=performance.now(); } };
+  if(LITE) return liteify().then(after,e=>{console.warn('lite failed',e);after();});
+  after();
 }
-const go=()=>{ init(); if(!q.has('manual')) requestAnimationFrame(loop); else manual=true; if(q.has('demo')) startDemo(); setTimeout(()=>document.body.classList.add('hide-cursor'),3000); };
+const go=()=>{ const p=init(); if(q.has('manual')) manual=true; Promise.resolve(p).then(()=>{ if(!q.has('manual')) requestAnimationFrame(loop); }); if(q.has('demo')) startDemo(); setTimeout(()=>document.body.classList.add('hide-cursor'),3000); };
 function startDemo(){
   const list=(C.paintedGreetings||['С днём рождения, Маша']); let i=0;
   const cycle=()=>{ paintGreeting(list[i++%list.length],6000); setTimeout(()=>eraseGreeting(2500),9000); setTimeout(cycle,13000); };

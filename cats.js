@@ -3,8 +3,12 @@
 'use strict';
 const C=window.BDAY||{}, A=()=>window.SCENE_ANCHORS, OUT='#261e1c';
 const NS='http://www.w3.org/1999/xhtml', W=1920,H=1080, BASE=128;
-let ctxB,ctxF;
+let ctxB,ctxF,LITEC=false;
 function mkCanvas(layer){
+  if(!(layer instanceof SVGElement)){ // лёгкий режим: обычный div-слой
+    const cv=document.createElement('canvas'); cv.width=W;cv.height=H; cv.style.cssText='position:absolute;left:0;top:0;width:1920px;height:1080px;display:block';
+    layer.appendChild(cv); return cv.getContext('2d');
+  }
   const fo=document.createElementNS('http://www.w3.org/2000/svg','foreignObject');
   fo.setAttribute('x',0);fo.setAttribute('y',0);fo.setAttribute('width',W);fo.setAttribute('height',H);
   const cv=document.createElementNS(NS,'canvas'); cv.width=W;cv.height=H; cv.style.cssText='width:1920px;height:1080px;display:block';
@@ -80,7 +84,29 @@ function palette(c,S){
 function note(c,x,y,s,col){c.fillStyle=col;c.strokeStyle=OUT;c.lineWidth=2.5;c.beginPath();c.ellipse(x,y,7*s,5*s,-.4,0,7);c.fill();c.stroke();c.beginPath();c.moveTo(x+6*s,y-1*s);c.lineTo(x+6*s,y-24*s);c.lineTo(x+16*s,y-18*s);c.stroke();}
 
 /* рисуем кота с аксессуарами */
+const SPR=new Map();
+function catSprite(k,S,pose,blink){
+  const key=k.name+'|'+pose+'|'+blink+'|'+(k.carry||'');
+  let sp=SPR.get(key); if(sp) return sp;
+  const w=Math.ceil(2.1*S), h=Math.ceil(1.8*S), ox=w/2, oy=Math.ceil(1.62*S);
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const g=cv.getContext('2d');
+  g.save(); g.translate(ox,oy);
+  window.drawBaseCat(g,{x:0,y:0,scale:S,t:.2,phase:0,walkPhase:pose===0?null:(pose===1?1.2:-1.2),facing:1,blink:blink});
+  k.acc&&k.acc(g,S,{t:0,carry:k.carry,flash:0,name:k.name});
+  g.restore(); sp={cv,ox,oy}; SPR.set(key,sp); return sp;
+}
+function drawCatLite(ctx,k){
+  const S=BASE*(k.scale||1), t=k.t, ph=k.phase||0;
+  let pose=0, bobY=Math.sin(t*2.1+ph)*S*.012, sway=Math.sin(t*.9+ph)*.02;
+  if(k.walk!=null){pose=Math.sin(k.walk)>0?1:2; bobY=-Math.abs(Math.sin(k.walk))*S*.035; sway=Math.sin(k.walk)*.03;}
+  const blink=((t+ph)%3.5)<.14?1:0;
+  const sp=catSprite(k,S,pose,blink);
+  ctx.save(); ctx.translate(k.x,k.y+(k.hop||0)+bobY); ctx.rotate((k.rot||0)+sway); ctx.drawImage(sp.cv,-sp.ox,-sp.oy); 
+  if(k.flash>0){ctx.translate(0,-.2*S);const fl=k.flash;ctx.globalAlpha=fl;ctx.fillStyle='#fffbe0';ctx.beginPath();ctx.arc(.18*S,-.1*S,S*.5*fl+S*.1,0,7);ctx.fill();}
+  ctx.restore();
+}
 function drawCat(ctx,k){
+  if(LITEC) return drawCatLite(ctx,k);
   const S=BASE*(k.scale||1);
   ctx.save();ctx.translate(k.x,k.y+(k.hop||0));ctx.rotate(k.rot||0);
   window.drawBaseCat(ctx,{x:0,y:0,scale:S,t:k.t,phase:k.phase,walkPhase:k.walk,facing:k.face});
@@ -176,14 +202,15 @@ function bubbleDraw(ctx,text,x,y,alpha){
 }
 
 function frame(T,dt){
-  if(!started){ if(!Scene.layers.back||!window.SCENE_ANCHORS) return; ctxB=mkCanvas(Scene.layers.back);ctxF=mkCanvas(Scene.layers.front);setup();started=true; }
+  if(!started){ if(!Scene.layers.back||!window.SCENE_ANCHORS) return; LITEC=!!Scene.lite;ctxB=mkCanvas(Scene.layers.back);ctxF=mkCanvas(Scene.layers.front);setup();started=true; }
   const t=T/1000, a=A();
   ctxB.clearRect(0,0,W,H);ctxF.clearRect(0,0,W,H);
+  if(LITEC)Scene.lite.balloons(ctxB,t);
   Object.values(cats).forEach(k=>{k.t=t;});
 
   waiters.forEach(w=>waiterTick(w,t));
   /* шарики 2 и 4 плавно покачиваются */
-  const b2=document.getElementById('bal2'),b4=document.getElementById('bal4');
+  const b2=LITEC?null:document.getElementById('bal2'),b4=document.getElementById('bal4');
   if(b2)b2.setAttribute('transform',`translate(0 ${(Math.sin(t*2*Math.PI/3.4)*7).toFixed(2)}) rotate(${(Math.sin(t*2*Math.PI/5.3+.5)*1.4).toFixed(3)} 925 585)`);
   if(b4)b4.setAttribute('transform',`translate(0 ${(Math.sin(t*2*Math.PI/3.9+1.7)*7).toFixed(2)}) rotate(${(Math.sin(t*2*Math.PI/4.7+2.2)*1.4).toFixed(3)} 1090 590)`);
   /* танцор */
@@ -232,7 +259,9 @@ function frame(T,dt){
   ctxB.fillStyle='#ffb347';ctxB.strokeStyle=OUT;ctxB.lineWidth=2.5;ctxB.beginPath();ctxB.ellipse(tip.x,tip.y-7,6,10,0,0,7);ctxB.fill();ctxB.stroke();
   ctxB.restore();
   if(bubble){const e=t-bubble.t0,al=Math.min(1,e/.4)*Math.min(1,(5.4-e)/.5);
-    if(al>0){bubbleDraw(ctxB,bubble.text,a.compliment.bubble.x,a.compliment.bubble.y,Math.max(0,al));}}
+    if(al>0){ if(LITEC){ if(!bubble.cv){const cv=document.createElement('canvas');cv.width=460;cv.height=230;bubbleDraw(cv.getContext('2d'),bubble.text,230,190,1);bubble.cv=cv;}
+        ctxB.globalAlpha=Math.max(0,al);ctxB.drawImage(bubble.cv,a.compliment.bubble.x-230,a.compliment.bubble.y-190);ctxB.globalAlpha=1; }
+      else bubbleDraw(ctxB,bubble.text,a.compliment.bubble.x,a.compliment.bubble.y,Math.max(0,al));}}
   /* ---- передний слой ---- */
   waiters.forEach(w=>{if(w.dish){ctxF.save();ctxF.translate(w.dish.x,w.dish.y);dishDraw(ctxF,BASE,w.dish.type);ctxF.restore();}});
   const order=['waiterA','waiterB','painter','dancer','photographer','snowCat'].sort((p,q)=>cats[p].y-cats[q].y);
@@ -242,7 +271,7 @@ function frame(T,dt){
   for(let i=0;i<3;i++){const k=(t*.6+i/3)%1;note(ctxF,d.x+70+Math.sin(k*6+i)*18,d.y-110-k*90,1,['#ff7aa2','#7ab8ff','#ffd34d'][i]);ctxF.globalAlpha=1;}
 }
 function boot(){
-  if(!window.Scene||!Scene.svg.querySelector('#catsBack')){return setTimeout(boot,100);}
+  if(!window.Scene||!Scene.layers.back){return setTimeout(boot,100);}
   window.SceneHooks={onFrame:frame};
 }
 boot();
