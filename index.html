@@ -66,6 +66,7 @@
   <span>На весь экран</span>
 </button>
 <div class="hint" id="hint">F или лапка справа — на весь экран</div>
+<script src="photos.js"></script>
 <script>
 /* ============================================================
    CONFIG — NAME default, override with ?name=
@@ -98,6 +99,22 @@ const GREETINGS = [
   else nameEl.classList.add('hidden');
   document.getElementById('age').textContent = String(AGE);
   document.getElementById('warmLine').textContent = WISHES[0];
+
+  // ---- photographer photos ----
+  const PHOTO_LIST = (window.PHOTOS || []).filter(Boolean);
+  const photoImgs = PHOTO_LIST.map(src => {
+    const im = new Image();
+    im.src = src;
+    return im;
+  });
+  let photoIdx = 0;
+  function nextPhoto() {
+    if (!photoImgs.length) return null;
+    const im = photoImgs[photoIdx % photoImgs.length];
+    photoIdx++;
+    return im;
+  }
+
 
   // ---- fullscreen ----
   const fsBtn = document.getElementById('fsBtn');
@@ -295,6 +312,8 @@ const GREETINGS = [
     if (c.prop === 'wand') drawWand(c, t);
     if (c.prop === 'bottle') drawBottle(c, t);
     if (c.prop === 'net') drawNet(c, t);
+    if (c.prop === 'camera') drawCamera(c, t);
+    if (c.prop === 'polaroid') drawPolaroid(c, t);
 
     ctx.restore();
     if (c.forceBlink > 0) c.forceBlink -= 0.016;
@@ -373,6 +392,68 @@ const GREETINGS = [
     ctx.strokeStyle='#d4a574'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,8); ctx.lineTo(0,-10); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(0,-16,8,7,0,0,Math.PI*2);
     ctx.strokeStyle='rgba(255,230,200,0.55)'; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.restore();
+  }
+  function drawCamera(c,t){
+    ctx.save(); ctx.translate(18, -4); ctx.rotate(-0.15);
+    roundRect(-8,-6,16,12,2,'#4a3a48');
+    ctx.beginPath(); ctx.arc(0,0,4.5,0,Math.PI*2); ctx.fillStyle='#2a1e28'; ctx.fill();
+    ctx.beginPath(); ctx.arc(0,0,2.2,0,Math.PI*2); ctx.fillStyle='#7ab'; ctx.fill();
+    roundRect(-4,-9,6,3,1,'#6a5a68');
+    ctx.restore();
+  }
+  function drawPolaroid(c,t){
+    // held up in front of cat when showing
+    const show = c.showPhoto;
+    ctx.save();
+    if (show) {
+      ctx.translate(0, -52 + Math.sin(t*2)*2);
+      ctx.rotate(Math.sin(t*1.2+c.phase)*0.04);
+      ctx.scale(1.55, 1.55);
+    } else {
+      ctx.translate(22, -10);
+      ctx.rotate(-0.2);
+      ctx.scale(0.85, 0.85);
+    }
+    // frame
+    roundRect(-22,-28,44,50,3,'#fff8f0');
+    ctx.strokeStyle='rgba(180,140,110,0.35)'; ctx.lineWidth=1; ctx.stroke();
+    // photo area
+    ctx.save();
+    ctx.beginPath(); ctx.rect(-18,-24,36,32); ctx.clip();
+    const im = c.photoImg;
+    if (im && im.complete && im.naturalWidth) {
+      const iw=im.naturalWidth, ih=im.naturalHeight;
+      const s=Math.max(36/iw, 32/ih);
+      const dw=iw*s, dh=ih*s;
+      ctx.drawImage(im, -18+(36-dw)/2, -24+(32-dh)/2, dw, dh);
+    } else {
+      // cute placeholder
+      const g=ctx.createLinearGradient(-18,-24,18,8);
+      g.addColorStop(0,'#ffe0ec'); g.addColorStop(1,'#ffe8d0');
+      ctx.fillStyle=g; ctx.fillRect(-18,-24,36,32);
+      const kind = (c.photoPlaceholder|0) % 2;
+      if (kind===0){
+        // heart
+        ctx.translate(0,-8); ctx.scale(1.1,1.1);
+        ctx.beginPath(); ctx.moveTo(0,4);
+        ctx.bezierCurveTo(0,0,-8,0,-8,6); ctx.bezierCurveTo(-8,12,0,16,0,20);
+        ctx.bezierCurveTo(0,16,8,12,8,6); ctx.bezierCurveTo(8,0,0,0,0,4);
+        ctx.fillStyle='rgba(255,120,150,0.75)'; ctx.fill();
+      } else {
+        // cat silhouette
+        ctx.fillStyle='rgba(90,60,70,0.45)';
+        ctx.beginPath(); ctx.ellipse(0,-6,8,7,0,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(0,-14,6,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(-5,-18); ctx.lineTo(-3,-24); ctx.lineTo(-1,-18); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(5,-18); ctx.lineTo(3,-24); ctx.lineTo(1,-18); ctx.fill();
+      }
+    }
+    ctx.restore();
+    // caption strip
+    ctx.fillStyle='rgba(140,90,70,0.55)';
+    ctx.font='600 5px Manrope,sans-serif'; ctx.textAlign='center';
+    ctx.fillText(c.photoCaption || '♥', 0, 16);
     ctx.restore();
   }
   function star(x,y,r,ri){
@@ -530,6 +611,14 @@ const GREETINGS = [
       x:W*0.65, y:H*0.68, facing:-1, prop:'wand',
       state:'idle', phase:5.5, walkSpeed:6
     }));
+    // Photographer — cycles polaroids from photos/
+    cats.push(makeCat({
+      role:'photo', pal:PALETTES[4], scale:1.05,
+      x:W+100, y:H*0.70, facing:-1, prop:'camera',
+      state:'wait', phase:2.7, walkSpeed:5.2,
+      showPhoto:false, photoImg:null, photoPlaceholder:0,
+      photoCaption:'♥', nextPhotoAt: 20
+    }));
   }
 
   function makeCat(o){
@@ -577,16 +666,19 @@ const GREETINGS = [
     { at: 6,  act:'lightFairy' },
     { at: 12, act:'lightCake' },
     { at: 18, act:'wine' },
+    { at: 22, act:'photoShow' },
     { at: 24, act:'signSwap' },
     { at: 28, act:'spark' },
     { at: 34, act:'snowman' },
     { at: 40, act:'wakeSleepy' },
     { at: 48, act:'signSwap' },
+    { at: 52, act:'photoShow' },
     { at: 55, act:'balloonPass' },
     { at: 62, act:'spark' },
     { at: 70, act:'signSwap' },
     { at: 78, act:'catsHug' },
-    { at: 90, act:'loop' }
+    { at: 82, act:'photoShow' },
+    { at: 96, act:'loop' }
   ];
   let schedIdx = 0;
   let worldT0 = 0;
@@ -641,6 +733,18 @@ const GREETINGS = [
         sign.pendingHug=true; spark.pendingHug=true;
       }
     }
+    if (act==='photoShow'){
+      const ph = getCat('photo');
+      if (ph){
+        ph.prop = 'polaroid';
+        ph.photoImg = nextPhoto();
+        ph.photoPlaceholder = photoIdx;
+        ph.photoCaption = ['Для тебя','Маша ♥','Наш вечер','24'][photoIdx % 4];
+        ph.showPhoto = false;
+        ph.x = -100; ph.y = H*0.70; ph.facing = 1;
+        ph.state = 'walk'; ph.targetX = W*0.50; ph.task = 'showPhoto';
+      }
+    }
     if (act==='loop'){
       // reset some props gently and restart schedule
       candles.forEach(c=>c.lit=false);
@@ -650,6 +754,8 @@ const GREETINGS = [
       if (sleepy){ sleepy.asleep=true; sleepy.state='sleep'; }
       if (lamp){ lamp.x=W+80; lamp.state='wait'; lamp.lit=false; }
       if (wine){ wine.x=-100; wine.state='wait'; }
+      const ph = getCat('photo');
+      if (ph){ ph.x=W+100; ph.state='wait'; ph.prop='camera'; ph.showPhoto=false; ph.pendingPhotoExit=false; }
       loopBase = performance.now()/1000;
       schedIdx = 0;
     }
@@ -671,6 +777,7 @@ const GREETINGS = [
           if (c.task==='build'){ c.state='build'; c.timer=0; }
           if (c.task==='fairy'){ c.state='lightFairy'; c.timer=0; }
           if (c.task==='cake'){ c.state='lightCake'; c.timer=0; }
+          if (c.task==='showPhoto'){ c.state='showPhoto'; c.timer=0; c.showPhoto=true; c.task=null; popHearts(c.x, c.y-40, 7); }
         }
       }
 
@@ -727,6 +834,27 @@ const GREETINGS = [
         if (idx>=candles.length-1 && c.timer>4.5){
           c.state='walk'; c.targetX=W*0.62; c.y=H*0.74; c.lit=false; popHearts(cake.x, cake.y-50, 6);
         }
+      }
+
+      if (c.state==='showPhoto'){
+        c.timer += dt;
+        c.y = H*0.70 + Math.sin(t*2)*1.5;
+        if (c.timer > 9){
+          c.showPhoto = false;
+          c.state = 'walk';
+          c.targetX = W + 120;
+          c.facing = 1;
+          c.prop = 'camera';
+          c.pendingPhotoExit = true;
+        }
+      }
+      if (c.role==='photo' && c.pendingPhotoExit && c.state==='idle'){
+        c.pendingPhotoExit = false;
+        c.x = W + 100; c.prop = 'camera'; c.state = 'wait';
+      }
+      // if walked off after show
+      if (c.role==='photo' && c.pendingPhotoExit && c.state==='walk' && c.targetX > W && Math.abs(c.x - c.targetX) < 3){
+        c.x = c.targetX; c.state='idle';
       }
 
       if (c.state==='stretch'){
