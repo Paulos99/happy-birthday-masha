@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>С днём рождения, Маша</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Manrope:wght@300;400&display=swap');
+
+  :root {
+    --bg0: #0b0610;
+    --bg1: #1a0d18;
+    --warm: #ffb38a;
+    --gold: #f6d7a8;
+    --rose: #ff8fab;
+    --soft: #ffe8d6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 50% 30%, #2a1524 0%, var(--bg1) 40%, var(--bg0) 100%);
+    color: var(--soft);
+    font-family: 'Manrope', 'Segoe UI', system-ui, sans-serif;
+    cursor: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  body.cursor-visible { cursor: default; }
+
+  #scene {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 1;
+  }
+
+  .glow-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 75%, rgba(255, 140, 80, 0.18), transparent 70%),
+      radial-gradient(ellipse 40% 30% at 20% 80%, rgba(255, 100, 60, 0.10), transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 80%, rgba(255, 100, 60, 0.10), transparent 60%),
+      radial-gradient(ellipse 50% 35% at 50% 15%, rgba(255, 180, 140, 0.08), transparent 65%);
+    animation: candlePulse 6s ease-in-out infinite;
+  }
+
+  @keyframes candlePulse {
+    0%, 100% { opacity: 0.85; }
+    50% { opacity: 1; }
+  }
+
+  .vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(5, 2, 8, 0.55) 100%);
+  }
+
+  .content {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 4vh 6vw;
+    pointer-events: none;
+  }
+
+  .age {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-weight: 600;
+    font-size: clamp(7rem, 22vw, 18rem);
+    line-height: 0.85;
+    letter-spacing: 0.04em;
+    color: rgba(246, 215, 168, 0.14);
+    text-shadow:
+      0 0 40px rgba(255, 179, 138, 0.35),
+      0 0 90px rgba(255, 140, 100, 0.25),
+      0 0 160px rgba(255, 100, 70, 0.18);
+    margin-bottom: -0.18em;
+    animation: ageBreathe 7s ease-in-out infinite;
+    position: relative;
+  }
+
+  .age::after {
+    content: attr(data-age);
+    position: absolute;
+    inset: 0;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(246, 215, 168, 0.22);
+    filter: blur(0.3px);
+  }
+
+  @keyframes ageBreathe {
+    0%, 100% { transform: scale(1); opacity: 0.95; filter: brightness(1); }
+    50% { transform: scale(1.015); opacity: 1; filter: brightness(1.08); }
+  }
+
+  .greeting {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-weight: 400;
+    font-style: italic;
+    font-size: clamp(2.4rem, 6.5vw, 5.2rem);
+    line-height: 1.15;
+    letter-spacing: 0.02em;
+    color: var(--gold);
+    text-shadow:
+      0 0 18px rgba(255, 200, 140, 0.55),
+      0 0 48px rgba(255, 150, 100, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.45);
+    animation: textShimmer 5.5s ease-in-out infinite;
+    margin-top: -0.05em;
+  }
+
+  .name {
+    font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    font-weight: 600;
+    font-size: clamp(1.8rem, 4.2vw, 3.2rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--warm);
+    margin-top: 0.35em;
+    text-shadow:
+      0 0 16px rgba(255, 160, 120, 0.5),
+      0 0 40px rgba(255, 120, 90, 0.28);
+    animation: textShimmer 5.5s ease-in-out infinite 0.4s;
+  }
+
+  .name.hidden { display: none; }
+
+  .line {
+    margin-top: 1.4em;
+    max-width: 28em;
+    font-weight: 300;
+    font-size: clamp(1rem, 2.1vw, 1.45rem);
+    line-height: 1.55;
+    letter-spacing: 0.03em;
+    color: rgba(255, 232, 214, 0.82);
+    text-shadow: 0 0 12px rgba(255, 180, 140, 0.25);
+    animation: softFade 8s ease-in-out infinite;
+  }
+
+  .date {
+    margin-top: 1.8em;
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(0.95rem, 1.6vw, 1.25rem);
+    letter-spacing: 0.28em;
+    color: rgba(246, 215, 168, 0.55);
+    text-shadow: 0 0 10px rgba(255, 180, 120, 0.2);
+  }
+
+  .hint {
+    position: fixed;
+    bottom: 2.2vh;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    color: rgba(255, 232, 214, 0.28);
+    opacity: 1;
+    transition: opacity 1.2s ease;
+    pointer-events: none;
+  }
+
+  .hint.fade { opacity: 0; }
+
+  @keyframes textShimmer {
+    0%, 100% { filter: brightness(1); text-shadow: 0 0 18px rgba(255, 200, 140, 0.55), 0 0 48px rgba(255, 150, 100, 0.35), 0 2px 8px rgba(0,0,0,0.45); }
+    50% { filter: brightness(1.12); text-shadow: 0 0 28px rgba(255, 210, 160, 0.75), 0 0 70px rgba(255, 160, 110, 0.45), 0 2px 8px rgba(0,0,0,0.45); }
+  }
+
+  @keyframes softFade {
+    0%, 100% { opacity: 0.78; }
+    50% { opacity: 0.95; }
+  }
+
+  @media (orientation: portrait) {
+    .age { font-size: clamp(6rem, 36vw, 14rem); }
+    .greeting { font-size: clamp(2rem, 8vw, 3.6rem); }
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div class="glow-layer" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<main class="content">
+  <div class="age" id="age" data-age="24">24</div>
+  <h1 class="greeting">С днём рождения!</h1>
+  <div class="name" id="nameEl"></div>
+  <p class="line" id="warmLine">Пусть этот вечер будет тёплым — как вино, как свечи, как снег за окном.</p>
+  <p class="date">05.11.2002 — 05.11.2026</p>
+</main>
+
+<div class="hint" id="hint">двойной клик — на весь экран</div>
+
+<script>
+/* ============================================================
+   CONFIG — change NAME here, or pass ?name=Маша in the URL
+   ============================================================ */
+const NAME = 'Маша';
+const AGE = 24;
+const DATE_LINE = '05.11.2002 — 05.11.2026';
+const WARM_LINE = 'Пусть этот вечер будет тёплым — как вино, как свечи, как снег за окном.';
+/* ============================================================ */
+
+(function () {
+  const params = new URLSearchParams(location.search);
+  const name = (params.get('name') || NAME || '').trim();
+  const nameEl = document.getElementById('nameEl');
+  if (name) {
+    nameEl.textContent = name;
+    nameEl.classList.remove('hidden');
+    document.title = 'С днём рождения, ' + name;
+  } else {
+    nameEl.classList.add('hidden');
+  }
+  document.getElementById('age').textContent = String(AGE);
+  document.getElementById('age').setAttribute('data-age', String(AGE));
+  document.getElementById('warmLine').textContent = WARM_LINE;
+
+  // Hide hint after a bit
+  setTimeout(() => document.getElementById('hint').classList.add('fade'), 5000);
+
+  // Cursor hide after idle
+  let idleTimer;
+  const showCursor = () => {
+    document.body.classList.add('cursor-visible');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => document.body.classList.remove('cursor-visible'), 2000);
+  };
+  ['mousemove', 'mousedown', 'touchstart', 'keydown'].forEach(ev =>
+    window.addEventListener(ev, showCursor, { passive: true })
+  );
+  showCursor();
+
+  // Fullscreen on double-click / click toggle
+  const toggleFs = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.().catch(() => {});
+    }
+  };
+  let lastClick = 0;
+  window.addEventListener('click', (e) => {
+    const now = Date.now();
+    if (now - lastClick < 400) toggleFs();
+    lastClick = now;
+  });
+  window.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    toggleFs();
+  });
+
+  // -------- Canvas animation --------
+  const canvas = document.getElementById('scene');
+  const ctx = canvas.getContext('2d', { alpha: true });
+  let W = 0, H = 0, dpr = 1;
+  let snow = [];
+  let bokeh = [];
+  let hearts = [];
+  let sparks = [];
+  let lastBurst = 0;
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    seedParticles();
+  }
+
+  function seedParticles() {
+    const area = W * H;
+    const snowN = Math.min(140, Math.max(60, Math.floor(area / 14000)));
+    const bokehN = Math.min(28, Math.max(12, Math.floor(area / 70000)));
+    const heartN = Math.min(10, Math.max(5, Math.floor(area / 160000)));
+
+    snow = Array.from({ length: snowN }, () => makeSnow());
+    bokeh = Array.from({ length: bokehN }, () => makeBokeh());
+    hearts = Array.from({ length: heartN }, () => makeHeart());
+    sparks = [];
+  }
+
+  function makeSnow() {
+    const z = Math.random();
+    return {
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.6 + z * 2.4,
+      vy: 0.25 + z * 0.85,
+      vx: (Math.random() - 0.5) * 0.35,
+      phase: Math.random() * Math.PI * 2,
+      wobble: 0.2 + Math.random() * 0.5,
+      a: 0.25 + z * 0.55
+    };
+  }
+
+  function makeBokeh() {
+    return {
+      x: Math.random() * W,
+      y: H * (0.35 + Math.random() * 0.65),
+      r: 8 + Math.random() * 42,
+      a: 0.04 + Math.random() * 0.10,
+      vx: (Math.random() - 0.5) * 0.12,
+      vy: (Math.random() - 0.5) * 0.08,
+      hue: Math.random() < 0.55 ? 25 : (Math.random() < 0.5 ? 350 : 45),
+      phase: Math.random() * Math.PI * 2
+    };
+  }
+
+  function makeHeart() {
+    return {
+      x: Math.random() * W,
+      y: H + Math.random() * H * 0.3,
+      s: 4 + Math.random() * 10,
+      vy: -(0.15 + Math.random() * 0.35),
+      vx: (Math.random() - 0.5) * 0.2,
+      a: 0.12 + Math.random() * 0.22,
+      rot: (Math.random() - 0.5) * 0.4,
+      phase: Math.random() * Math.PI * 2
+    };
+  }
+
+  function spawnBurst(cx, cy) {
+    const n = 18 + Math.floor(Math.random() * 14);
+    for (let i = 0; i < n; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const sp = 0.6 + Math.random() * 2.4;
+      sparks.push({
+        x: cx,
+        y: cy,
+        vx: Math.cos(ang) * sp,
+        vy: Math.sin(ang) * sp - 0.4,
+        life: 1,
+        decay: 0.008 + Math.random() * 0.012,
+        r: 1 + Math.random() * 2.2,
+        hue: Math.random() < 0.5 ? 30 : (Math.random() < 0.5 ? 350 : 50)
+      });
+    }
+  }
+
+  function drawHeart(x, y, s, rot, a) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    ctx.scale(s / 16, s / 16);
+    ctx.beginPath();
+    ctx.moveTo(0, 4);
+    ctx.bezierCurveTo(0, 0, -8, 0, -8, 6);
+    ctx.bezierCurveTo(-8, 12, 0, 16, 0, 20);
+    ctx.bezierCurveTo(0, 16, 8, 12, 8, 6);
+    ctx.bezierCurveTo(8, 0, 0, 0, 0, 4);
+    ctx.fillStyle = `rgba(255, 140, 160, ${a})`;
+    ctx.shadowColor = `rgba(255, 120, 140, ${a * 0.8})`;
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(32, now - last);
+    last = now;
+    const t = now * 0.001;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // soft ambient orbs near bottom (candle warmth)
+    for (let i = 0; i < 3; i++) {
+      const bx = W * (0.25 + i * 0.25) + Math.sin(t * 0.3 + i) * 30;
+      const by = H * 0.88 + Math.sin(t * 0.5 + i * 1.3) * 8;
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, 120 + i * 20);
+      g.addColorStop(0, `rgba(255, 150, 80, ${0.07 + Math.sin(t + i) * 0.015})`);
+      g.addColorStop(1, 'rgba(255, 120, 60, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(bx, by, 140, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // bokeh
+    for (const b of bokeh) {
+      b.x += b.vx + Math.sin(t * 0.4 + b.phase) * 0.05;
+      b.y += b.vy + Math.cos(t * 0.35 + b.phase) * 0.04;
+      if (b.x < -b.r) b.x = W + b.r;
+      if (b.x > W + b.r) b.x = -b.r;
+      if (b.y < H * 0.2) b.y = H + b.r;
+      if (b.y > H + b.r) b.y = H * 0.35;
+      const pulse = b.a * (0.75 + 0.25 * Math.sin(t * 0.8 + b.phase));
+      const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r);
+      g.addColorStop(0, `hsla(${b.hue}, 80%, 70%, ${pulse})`);
+      g.addColorStop(0.5, `hsla(${b.hue}, 70%, 60%, ${pulse * 0.35})`);
+      g.addColorStop(1, `hsla(${b.hue}, 60%, 50%, 0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // hearts
+    for (const h of hearts) {
+      h.x += h.vx + Math.sin(t * 0.5 + h.phase) * 0.15;
+      h.y += h.vy * (dt / 16);
+      h.rot += 0.002;
+      if (h.y < -40) {
+        h.y = H + 20 + Math.random() * 40;
+        h.x = Math.random() * W;
+      }
+      const a = h.a * (0.7 + 0.3 * Math.sin(t + h.phase));
+      drawHeart(h.x, h.y, h.s, h.rot + Math.sin(t + h.phase) * 0.15, a);
+    }
+
+    // snow
+    for (const s of snow) {
+      s.phase += 0.01;
+      s.x += s.vx + Math.sin(s.phase) * s.wobble * 0.4;
+      s.y += s.vy * (dt / 16);
+      if (s.y > H + 4) {
+        s.y = -4;
+        s.x = Math.random() * W;
+      }
+      if (s.x < -4) s.x = W + 4;
+      if (s.x > W + 4) s.x = -4;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 245, 235, ${s.a})`;
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // occasional sparkle bursts
+    if (now - lastBurst > 7000 + Math.random() * 6000) {
+      lastBurst = now;
+      spawnBurst(
+        W * (0.2 + Math.random() * 0.6),
+        H * (0.15 + Math.random() * 0.45)
+      );
+    }
+
+    for (let i = sparks.length - 1; i >= 0; i--) {
+      const p = sparks[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.015;
+      p.life -= p.decay;
+      if (p.life <= 0) {
+        sparks.splice(i, 1);
+        continue;
+      }
+      ctx.beginPath();
+      ctx.fillStyle = `hsla(${p.hue}, 90%, 70%, ${p.life * 0.9})`;
+      ctx.shadowColor = `hsla(${p.hue}, 100%, 65%, ${p.life})`;
+      ctx.shadowBlur = 8;
+      ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // tiny twinkles near greeting area
+    for (let i = 0; i < 6; i++) {
+      const tw = (Math.sin(t * 1.7 + i * 1.9) + 1) * 0.5;
+      if (tw < 0.7) continue;
+      const tx = W * (0.3 + (i % 3) * 0.2) + Math.sin(t * 0.3 + i) * 40;
+      const ty = H * (0.28 + Math.floor(i / 3) * 0.12) + Math.cos(t * 0.25 + i) * 20;
+      const a = (tw - 0.7) / 0.3 * 0.55;
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 230, 180, ${a})`;
+      ctx.arc(tx, ty, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+  lastBurst = performance.now();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
