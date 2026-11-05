@@ -12,7 +12,7 @@ function mkCanvas(layer){
 }
 const rr=(c,x,y,w,h,r)=>{c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();};
 function ink(c,f,lw){c.fillStyle=f;c.fill();c.strokeStyle=OUT;c.lineWidth=lw;c.lineJoin='round';c.lineCap='round';c.stroke();}
-const HEADCY=-.66, HEADTOP=-1.0;
+const HEADCY=-.7, HEADTOP=-1.04;
 
 /* аксессуары (в координатах кота: origin у ног, S — масштаб) */
 function hat(c,S,col,tilt=.18,dx=.06){
@@ -30,7 +30,7 @@ function beret(c,S){
   c.restore();
 }
 function scarf(c,S,t){
-  const y=-.34*S;
+  const y=-.38*S;
   c.beginPath();c.ellipse(0,y,.45*S,.085*S,0,0,7);ink(c,'#f48fb1',S*.04);
   c.strokeStyle='rgba(255,255,255,.8)';c.lineWidth=S*.03;
   for(let i=-3;i<=3;i++){c.beginPath();c.moveTo(i*.12*S,y-.07*S);c.lineTo(i*.12*S+.02*S,y+.07*S);c.stroke();}
@@ -38,30 +38,32 @@ function scarf(c,S,t){
   rr(c,0,0,.15*S,.32*S,S*.04);ink(c,'#f48fb1',S*.04);c.restore();
 }
 function apron(c,S){
-  rr(c,-.3*S,-.4*S,.6*S,.36*S,S*.07);ink(c,'#fff',S*.04);
-  c.strokeStyle='#f8bfd2';c.lineWidth=S*.03;c.beginPath();c.moveTo(-.2*S,-.34*S);c.lineTo(.2*S,-.34*S);c.stroke();
+  rr(c,-.28*S,-.34*S,.56*S,.3*S,S*.07);ink(c,'#fff',S*.04);
+  c.strokeStyle='#f8bfd2';c.lineWidth=S*.03;c.beginPath();c.moveTo(-.18*S,-.28*S);c.lineTo(.18*S,-.28*S);c.stroke();
 }
 function bowtie(c,S,col){
-  c.save();c.translate(0,-.36*S);c.beginPath();c.moveTo(0,0);c.lineTo(-.12*S,-.07*S);c.lineTo(-.12*S,.07*S);c.closePath();ink(c,col,S*.03);
+  c.save();c.translate(0,-.37*S);c.beginPath();c.moveTo(0,0);c.lineTo(-.12*S,-.07*S);c.lineTo(-.12*S,.07*S);c.closePath();ink(c,col,S*.03);
   c.beginPath();c.moveTo(0,0);c.lineTo(.12*S,-.07*S);c.lineTo(.12*S,.07*S);c.closePath();ink(c,col,S*.03);c.restore();
 }
-function dome(c,S,side=-1){
-  c.save();c.translate(side*.5*S,-.28*S);
-  c.beginPath();c.ellipse(0,.03*S,.3*S,.045*S,0,0,7);ink(c,'#e8e4ee',S*.035);
-  c.beginPath();c.arc(0,.02*S,.24*S,Math.PI,0);c.closePath();ink(c,'#f4f2f8',S*.035);
-  c.beginPath();c.arc(0,-.25*S,S*.035,0,7);ink(c,'#d6d2dc',S*.03);
-  c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=S*.03;c.beginPath();c.arc(0,.02*S,.17*S,Math.PI*1.1,Math.PI*1.4);c.stroke();
-  c.restore();
+function dishDraw(c,S,type){ // начало координат — центр тарелки
+  if(type==='dome'){
+    c.beginPath();c.ellipse(0,.03*S,.3*S,.045*S,0,0,7);ink(c,'#e8e4ee',S*.035);
+    c.beginPath();c.arc(0,.02*S,.24*S,Math.PI,0);c.closePath();ink(c,'#f4f2f8',S*.035);
+    c.beginPath();c.arc(0,-.25*S,S*.035,0,7);ink(c,'#d6d2dc',S*.03);
+    c.strokeStyle='rgba(255,255,255,.9)';c.lineWidth=S*.03;c.beginPath();c.arc(0,.02*S,.17*S,Math.PI*1.1,Math.PI*1.4);c.stroke();
+  }else if(type==='cheese'){
+    c.beginPath();c.ellipse(0,.03*S,.3*S,.05*S,0,0,7);ink(c,'#fffaf5',S*.035);
+    c.beginPath();c.moveTo(-.2*S,.0);c.lineTo(.18*S,-.1*S);c.lineTo(.2*S,.02*S);c.lineTo(-.2*S,.03*S);c.closePath();ink(c,'#ffd35e',S*.03);
+    c.fillStyle='#e8a93a';[[-.05,-.01],[.06,-.04],[.12,-.0]].forEach(([x,y])=>{c.beginPath();c.arc(x*S,y*S,S*.018,0,7);c.fill();});
+  }else{
+    c.beginPath();c.ellipse(0,.03*S,.32*S,.05*S,0,0,7);ink(c,'#fffaf5',S*.035);
+    c.beginPath();c.ellipse(-.07*S,-.02*S,.12*S,.06*S,.3,0,7);ink(c,'#f19a6b',S*.03);
+    c.beginPath();c.arc(.1*S,-.03*S,S*.05,0,7);ink(c,'#8fc47a',S*.03);c.beginPath();c.arc(.18*S,-.01*S,S*.04,0,7);ink(c,'#e84f5e',S*.03);
+  }
 }
-function plateFood(c,S,side=-1){
-  c.save();c.translate(side*.5*S,-.28*S);
-  c.beginPath();c.ellipse(0,.03*S,.32*S,.05*S,0,0,7);ink(c,'#fffaf5',S*.035);
-  c.beginPath();c.ellipse(-.07*S,-.02*S,.12*S,.06*S,.3,0,7);ink(c,'#f19a6b',S*.03);
-  c.beginPath();c.arc(.1*S,-.03*S,S*.05,0,7);ink(c,'#8fc47a',S*.03);c.beginPath();c.arc(.18*S,-.01*S,S*.04,0,7);ink(c,'#e84f5e',S*.03);
-  c.restore();
-}
+function carry(c,S,type,side=-1){c.save();c.translate(side*.5*S,-.3*S);dishDraw(c,S,type);c.restore();}
 function camera(c,S,flash){
-  c.save();c.translate(0,-.36*S);
+  c.save();c.translate(0,-.2*S);
   rr(c,-.26*S,-.14*S,.52*S,.3*S,S*.05);ink(c,'#4a4650',S*.035);
   rr(c,-.26*S,-.14*S,.52*S,.09*S,S*.04);ink(c,'#d8d4dc',S*.03);
   c.beginPath();c.arc(0,.02*S,.1*S,0,7);ink(c,'#8a86a0',S*.035);c.beginPath();c.arc(0,.02*S,.055*S,0,7);c.fillStyle='#2a2438';c.fill();
@@ -93,19 +95,63 @@ function setup(){
   const a=A();
   const mk=(name,extra)=>Object.assign({name,x:a[name].x,y:a[name].y,scale:a[name].scale,phase:Math.random()*6,t:0,face:a[name].flip?-1:1},extra);
   cats.painter=mk('painter',{face:-1,acc:(c,S)=>{beret(c,S);palette(c,S);}});
-  cats.waiterA=mk('waiterA',{face:1,ox:a.waiterA.x,acc:(c,S)=>{apron(c,S);dome(c,S,-1);hat(c,S,'#ffb3cf');bowtie(c,S,'#e8445f');}});
-  cats.waiterB=mk('waiterB',{face:1,ox:a.waiterB.x,acc:(c,S)=>{apron(c,S);plateFood(c,S,-1);hat(c,S,'#ffe27a');}});
+  cats.waiterA=mk('waiterA',{face:1,ox:a.waiterA.x,acc:(c,S,k)=>{apron(c,S);hat(c,S,'#ffb3cf');bowtie(c,S,'#e8445f');if(k.carry)carry(c,S,k.carry);}});
+  cats.waiterB=mk('waiterB',{face:1,ox:a.waiterB.x,acc:(c,S,k)=>{apron(c,S);hat(c,S,'#ffe27a');if(k.carry)carry(c,S,k.carry);}});
   cats.compliment=mk('compliment',{acc:(c,S)=>{hat(c,S,'#c9a8f0',-.15);}});
   cats.dancer=mk('dancer',{acc:(c,S,k)=>{hat(c,S,'#ffb3cf',.25);bowtie(c,S,'#e8445f');}});
   cats.lamplighter=mk('lamplighter',{acc:(c,S)=>{hat(c,S,'#ffe27a');}});
   cats.photographer=mk('photographer',{face:-1,flash:0,acc:(c,S,k)=>{hat(c,S,'#ffb3cf',.2);camera(c,S,k.flash);}});
   cats.snowCat=mk('snowCat',{face:-1,acc:(c,S,k)=>{scarf(c,S,k.t);hat(c,S,'#c9a8f0');}});
+  const stand={A:{x:700,y:782},B:{x:1240,y:790}};
+  waiters=[
+    mkW(cats.waiterA,{x:a.waiterA.x,y:a.waiterA.y},[],stand.A,{x:630,y:706},['dome','plate','cheese'],1.5,0),
+    mkW(cats.waiterB,{x:a.waiterB.x,y:a.waiterB.y},[{x:520,y:804}],stand.B,{x:1170,y:720},['plate','cheese','dome'],14,1)];
   Scene.options.autoRelightMs=null;
   // зажигаем свечи вручную, а поле «фонарщик» делает это на глазах
   nextPaintAt=2; 
 }
+let waiters=[];
 let nextPaintAt=0, phase='idle', eraseAt=0, lampState={mode:'idle',t0:0,idx:0}, snowAt=3, photoAt=6, bubble=null;
 
+
+/* ---------- официанты: принести блюдо на стол, уйти, вернуться, забрать, унести ---------- */
+function mkW(k,home,wp,stand,spot,types,hold0,i){
+  return {k,home,wp,stand,spot,types,ti:0,i,st:'hold',t0:0,holdFor:hold0,path:[],next:null,lt:null,dish:null,type:types[0],hidden:false};
+}
+function goto_(w,pts,next){w.path=pts.slice();w.next=next;w.st='walk';}
+function waiterTick(w,t){
+  const k=w.k, dt=w.lt==null?0:Math.min(.1,Math.max(0,t-w.lt)); w.lt=t; const S=BASE*(k.scale||1);
+  const there=[].concat(w.wp,[w.stand]), back=[].concat(w.wp.slice().reverse(),[w.home]);
+  if(w.firstT==null){w.firstT=t;w.t0=t;}
+  k.hop=0; k.walk=null; k.hidden=w.hidden;
+  const hand=()=>({x:k.x-.5*S,y:k.y-.3*S}), ease=p=>p*p*(3-2*p);
+  if(w.st==='walk'){
+    const tg=w.path[0], dx=tg.x-k.x, dy=tg.y-k.y, d=Math.hypot(dx,dy), step=125*dt;
+    if(d<=step){k.x=tg.x;k.y=tg.y;w.path.shift();if(!w.path.length){w.st=w.next;w.t0=t;}}
+    else{k.x+=dx/d*step;k.y+=dy/d*step;if(Math.abs(dx)>1)k.face=dx>0?1:-1;}
+    if(w.st==='walk'){k.walk=t*10;k.hop=0;}
+    k.carry=(w.next==='place'||w.next==='gone'||w.next==='hold')?w.type:null;
+    return;
+  }
+  k.face=1;
+  if(w.st==='hold'){k.carry=w.type;k.x=w.home.x;k.y=w.home.y;if(t-w.t0>=w.holdFor)goto_(w,there,'place');}
+  else if(w.st==='place'){
+    k.carry=null; const p=Math.min(1,(t-w.t0)/1.0), e=ease(p);
+    if(p<1){const h=hand();w.hx=w.hx==null?h.x:w.hx;w.hy=w.hy==null?h.y:w.hy;
+      w.dish={type:w.type,x:w.hx+(w.spot.x-w.hx)*e,y:w.hy+(w.spot.y-w.hy)*e-Math.sin(e*Math.PI)*50};}
+    else{w.hx=w.hy=null;w.dish={type:w.type,x:w.spot.x,y:w.spot.y};w.onTable=true;w.restFor=9;goto_(w,back,'rest');}
+  }
+  else if(w.st==='rest'){k.carry=null;if(t-w.t0>=w.restFor)goto_(w,there,'pick');}
+  else if(w.st==='pick'){
+    k.carry=null; const p=Math.min(1,(t-w.t0)/1.0), e=ease(p), h=hand();
+    if(p<1){w.dish={type:w.type,x:w.spot.x+(h.x-w.spot.x)*e,y:w.spot.y+(h.y-w.spot.y)*e-Math.sin(e*Math.PI)*50};}
+    else{w.dish=null;w.onTable=false;goto_(w,back.concat([{x:-170,y:w.home.y}]),'gone');}
+  }
+  else if(w.st==='gone'){
+    w.hidden=true;k.hidden=true;k.carry=null;
+    if(t-w.t0>3.5){w.hidden=false;k.hidden=false;w.ti=(w.ti+1)%w.types.length;w.type=w.types[w.ti];k.x=-170;k.y=w.home.y;w.holdFor=7;goto_(w,[w.home],'hold');}
+  }
+}
 function brush(ctx,k,tip){
   const S=BASE*k.scale, sx=k.x-.5*S, sy=k.y-.32*S;
   ctx.save();ctx.lineCap='round';
@@ -135,11 +181,11 @@ function frame(T,dt){
   ctxB.clearRect(0,0,W,H);ctxF.clearRect(0,0,W,H);
   Object.values(cats).forEach(k=>{k.t=t;});
 
-  /* официанты ходят вдоль стола */
-  [['waiterA',34,.5,0],['waiterB',30,.42,2]].forEach(([n,amp,sp,ph])=>{
-    const k=cats[n], s=Math.sin(t*sp+ph), v=Math.cos(t*sp+ph);
-    k.x=k.ox+s*amp; k.walk=t*8; k.face=v>=0?1:-1; if(Math.abs(v)<.18) k.walk=null;
-  });
+  waiters.forEach(w=>waiterTick(w,t));
+  /* шарики 2 и 4 плавно покачиваются */
+  const b2=document.getElementById('bal2'),b4=document.getElementById('bal4');
+  if(b2)b2.setAttribute('transform',`translate(0 ${(Math.sin(t*2*Math.PI/3.4)*7).toFixed(2)}) rotate(${(Math.sin(t*2*Math.PI/5.3+.5)*1.4).toFixed(3)} 925 585)`);
+  if(b4)b4.setAttribute('transform',`translate(0 ${(Math.sin(t*2*Math.PI/3.9+1.7)*7).toFixed(2)}) rotate(${(Math.sin(t*2*Math.PI/4.7+2.2)*1.4).toFixed(3)} 1090 590)`);
   /* танцор */
   const d=cats.dancer; d.x=a.dancer.x+Math.sin(t*1.6)*14; d.hop=-Math.abs(Math.sin(t*3.2))*22; d.rot=Math.sin(t*3.2)*.12; d.walk=t*9; d.face=Math.sin(t*1.6)>0?1:-1;
   /* снежный: подпрыгивает и кидает */
@@ -188,8 +234,9 @@ function frame(T,dt){
   if(bubble){const e=t-bubble.t0,al=Math.min(1,e/.4)*Math.min(1,(5.4-e)/.5);
     if(al>0){bubbleDraw(ctxB,bubble.text,a.compliment.bubble.x,a.compliment.bubble.y,Math.max(0,al));}}
   /* ---- передний слой ---- */
+  waiters.forEach(w=>{if(w.dish){ctxF.save();ctxF.translate(w.dish.x,w.dish.y);dishDraw(ctxF,BASE,w.dish.type);ctxF.restore();}});
   const order=['waiterA','waiterB','painter','dancer','photographer','snowCat'].sort((p,q)=>cats[p].y-cats[q].y);
-  order.forEach(n=>drawCat(ctxF,cats[n]));
+  order.forEach(n=>{if(!cats[n].hidden)drawCat(ctxF,cats[n]);});
   if(phase==='paint'||phase==='erase'){const tipP=Scene.paint.tip();if(tipP)brush(ctxF,pa,tipP);}
   // ноты танцора
   for(let i=0;i<3;i++){const k=(t*.6+i/3)%1;note(ctxF,d.x+70+Math.sin(k*6+i)*18,d.y-110-k*90,1,['#ff7aa2','#7ab8ff','#ffd34d'][i]);ctxF.globalAlpha=1;}

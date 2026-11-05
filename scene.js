@@ -337,17 +337,11 @@ function digit(d,tx,ty,rot,id){
   </g>`;
 }
 function buildBalloons(){
-  let s='<g>';
-  // палочки/ленты, тянущиеся к торту
-  s+=limb(1038,420,1018,560,8,'#f7c7da')+limb(884,420,904,560,8,'#f7c7da');
-  s+=digit(DIG_2,780,164,-5)+digit(DIG_4,988,160,5);
-  // блики-звёздочки
-  s+=star4(790,190,14,'#fff')+star4(1170,200,11,'#fff')+star4(1130,420,9,'#fff6c8');
-  // банты и ленты
-  s+=bow(930,436,.72,'#ffa7c8',-8)+bow(1086,430,.72,'#ffa7c8',8);
-  s+=`<path d="M920 470 C890 520 950 540 930 580 M1096 466 C1126 516 1066 546 1090 590" fill="none" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/>
-      <path d="M920 470 C890 520 950 540 930 580 M1096 466 C1126 516 1066 546 1090 590" fill="none" stroke="#ffb6d1" stroke-width="3.5" stroke-linecap="round"/>`;
-  return s+'</g>';
+  const rib='M920 470 C890 520 950 540 930 580', rib2='M1096 466 C1126 516 1066 546 1090 590';
+  const ribbon=d=>`<path d="${d}" fill="none" stroke="${OUT}" stroke-width="7" stroke-linecap="round"/><path d="${d}" fill="none" stroke="#ffb6d1" stroke-width="3.5" stroke-linecap="round"/>`;
+  // каждая цифра — отдельная группа (id bal2 / bal4), чтобы мягко покачиваться
+  return `<g id="bal2" filter="url(#wob)">${limb(884,420,904,560,8,'#f7c7da')}${digit(DIG_2,780,164,-5)}${star4(790,190,14,'#fff')}${bow(930,436,.72,'#ffa7c8',-8)}${ribbon(rib)}</g>`+
+         `<g id="bal4" filter="url(#wob)">${limb(1038,420,1018,560,8,'#f7c7da')}${digit(DIG_4,988,160,5)}${star4(1170,200,11,'#fff')}${star4(1130,420,9,'#fff6c8')}${bow(1086,430,.72,'#ffa7c8',8)}${ribbon(rib2)}</g>`;
 }
 function scallopsHem(){
   const N=28,cx=TB.cx,cy=TB.cy+125,rx=448,ry=112;
@@ -583,7 +577,7 @@ function build(){
   const lights=buildLights();
   const ground=buildGround();
   const props=buildLamp()+buildBackBushes()+buildEasel()+buildLadder()+buildPolaroid();
-  const tbl=buildBalloons()+buildTable()+buildBowFront()+buildTableItems();
+  const tbl=buildTable()+buildBowFront()+buildTableItems();
   const chairs=buildChairs();
   const date=buildDate();
   const dyn=`
@@ -597,6 +591,7 @@ function build(){
    `<g filter="url(#wob)">${props}</g>`+
    `<g id="dynProps">${lanterns}<g id="paintG"></g></g>`+
    catsBack+
+   buildBalloons()+
    `<g filter="url(#wob)">${tbl}</g>`+
    `<g id="candlesG"></g>`+
    `<g filter="url(#wob)">${chairs}${date}</g>`+
