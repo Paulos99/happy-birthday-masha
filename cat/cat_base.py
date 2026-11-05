@@ -1,89 +1,86 @@
-
-"""Rigged base cat — reference waiter proportions, smooth near-black outline."""
+"""Base cat from traced cat_main.jpg geometry (736²). Rigged idle+walk."""
 from __future__ import annotations
+
+import json
 import math
 from dataclasses import dataclass
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
-import numpy as np
+from pathlib import Path
+
 import cv2
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-OUTLINE = (26, 22, 20)
-FILL = (255, 253, 250)
-BLUSH = (255, 158, 168)
-INNER_EAR = (255, 188, 192)
-STRIPE = (145, 140, 145)
+REF = 736.0
+GEOM_PATH = Path("/workspace/bday/cat/measure/exact_paths.json")
+_G = json.loads(GEOM_PATH.read_text())
+
+STROKE = float(_G["stroke_w"])
+HEAD = [tuple(p) for p in _G["head"]]
+BODY = [tuple(p) for p in _G["body"]]
+EYE_L, EYE_R = tuple(_G["eyes"][0]), tuple(_G["eyes"][1])
+EYE_R_PX = float(_G["eye_r"])
+BLUSH_L, BLUSH_R = tuple(_G["blush"][0]), tuple(_G["blush"][1])
+BLUSH_R_PX = float(_G["blush_r"])
+STRIPES = _G["stripes"]
+WHISK_L = [tuple(w) for w in _G["whiskers_L"]]
+WHISK_R = [tuple(w) for w in _G["whiskers_R"]]
+MOUTH_C = tuple(_G["mouth_c"])
+MOUTH_W = float(_G["mouth_w"])
+HEAD_CX = float(_G["head_cx"])
+HEAD_CY = float(_G["head_cy"])
+BODY_CX = float(_G["body_cx"])
+NOTCH_Y = float(_G["notch_y"])
+FOOT_Y = float(_G["foot_y"])
+FOOT_L_X = float(_G["foot_l_x"])
+FOOT_R_X = float(_G["foot_r_x"])
+
+OUTLINE = (18, 16, 14)
+FILL = (255, 255, 255)
+BLUSH = (255, 186, 170)
+STRIPE = (168, 164, 166)
+BG = (255, 255, 255)
 
 
-def head_bun_pts(cx, cy, rx, ry, n=96, amp=0.007, seed=0.2):
-    pts = []
-    for i in range(n):
-        a = (i / n) * math.pi * 2 - math.pi / 2
-        c, s = math.cos(a), math.sin(a)
-        exp_x, exp_y = 1.9, 3.5
-        k = abs(c) ** exp_x + abs(s) ** exp_y
-        r = k ** (-1 / ((exp_x + exp_y) / 2))
-        cheek = 1.0 + 0.09 * (abs(c) ** 0.85) * max(0.0, 1 - abs(s + 0.1))
-        if s < -0.4:
-            r *= 0.90 + 0.10 * max(0, 1 + s)
-        w = 1 + math.sin(a * 2.6 + seed) * amp + math.cos(a * 4.1 + seed) * amp * 0.3
-        pts.append((cx + c * rx * r * cheek * w, cy + s * ry * r * w))
-    return pts
-
-
-def body_pts(cx, cy, rx, ry, n=64, amp=0.009, seed=1.0):
-    pts = []
-    for i in range(n):
+def wobble(pts, amp, seed=0.0):
+    if amp <= 0 or len(pts) < 4:
+        return list(pts)
+    out = []
+    n = len(pts)
+    for i, (x, y) in enumerate(pts):
+        p0 = pts[i - 1]
+        p1 = pts[(i + 1) % n]
+        dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+        L = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / L, dx / L
         a = (i / n) * math.pi * 2
-        c, s = math.cos(a), math.sin(a)
-        pear = 1 + 0.15 * max(0, s)
-        exp = 2.1
-        k = abs(c) ** exp + abs(s) ** exp
-        r = k ** (-1 / exp)
-        w = 1 + math.sin(a * 2.5 + seed) * amp
-        pts.append((cx + c * rx * r * pear * w, cy + s * ry * r * w))
+        j = math.sin(a * 3.0 + seed) * amp + math.sin(a * 7.0 + seed * 1.4) * amp * 0.4
+        out.append((x + nx * j, y + ny * j))
+    return out
+
+
+def head_path(ear_L=0.0, ear_R=0.0):
+    """Traced head+ears; optional ear tip twitch."""
+    pts = list(HEAD)
+    # Twitch: pull nearest tip neighborhood
+    for tip_target, twitch, side in (
+        ((247.0, 163.0), ear_L, -1),
+        ((513.0, 165.0), ear_R, 1),
+    ):
+        if abs(twitch) < 1e-4:
+            continue
+        i = min(range(len(pts)), key=lambda k: (pts[k][0] - tip_target[0]) ** 2 + (pts[k][1] - tip_target[1]) ** 2)
+        dx = twitch * 10 * side
+        dy = -abs(twitch) * 6
+        for k in range(-2, 3):
+            j = (i + k) % len(pts)
+            w = 1.0 - abs(k) / 3.0
+            x, y = pts[j]
+            pts[j] = (x + dx * w, y + dy * w)
     return pts
 
 
-def paint_shape(layer: Image.Image, pts, fill, outline, lw):
-    """Fast even outline via OpenCV dilate on tight bbox."""
-    if len(pts) < 3:
-        return
-    xs = [p[0] for p in pts]; ys = [p[1] for p in pts]
-    pad = int(lw) + 4
-    x0, y0 = max(0, int(min(xs)) - pad), max(0, int(min(ys)) - pad)
-    x1, y1 = min(layer.width, int(max(xs)) + pad + 1), min(layer.height, int(max(ys)) + pad + 1)
-    bw, bh = max(1, x1 - x0), max(1, y1 - y0)
-    local = [(p[0] - x0, p[1] - y0) for p in pts]
-    mask = np.zeros((bh, bw), np.uint8)
-    cv2.fillPoly(mask, [np.array(local, np.int32)], 255)
-    # light smooth edge
-    mask = cv2.GaussianBlur(mask, (3, 3), 0)
-    _, mask = cv2.threshold(mask, 100, 255, cv2.THRESH_BINARY)
-    if outline and lw > 0:
-        rad = max(1, int(round(lw)))
-        ker = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (rad * 2 + 1, rad * 2 + 1))
-        dil = cv2.dilate(mask, ker)
-        ring = cv2.subtract(dil, mask)
-        ol = np.zeros((bh, bw, 4), np.uint8)
-        ol[ring > 0] = (*outline, 255)
-        layer.alpha_composite(Image.fromarray(ol, 'RGBA'), (x0, y0))
-    fl = np.zeros((bh, bw, 4), np.uint8)
-    fc = fill if len(fill) == 4 else (*fill, 255)
-    fl[mask > 0] = fc
-    layer.alpha_composite(Image.fromarray(fl, 'RGBA'), (x0, y0))
-
-
-def paint_ellipse(layer, cx, cy, rx, ry, fill, outline=None, lw=0, n=48, amp=0.007, seed=0.0):
-    pts = [(cx + math.cos(a) * rx * (1 + math.sin(a * 2.3 + seed) * amp),
-            cy + math.sin(a) * ry * (1 + math.sin(a * 2.3 + seed) * amp))
-           for a in (i / n * math.pi * 2 for i in range(n))]
-    paint_shape(layer, pts, fill, outline, lw)
-
-
-def rot(x, y, ang, ox, oy):
-    ca, sa = math.cos(ang), math.sin(ang)
-    dx, dy = x - ox, y - oy
-    return ox + dx * ca - dy * sa, oy + dx * sa + dy * ca
+def body_path():
+    return list(BODY)
 
 
 @dataclass
@@ -93,12 +90,10 @@ class CatPose:
     ear_L: float = 0.0
     ear_R: float = 0.0
     blink: float = 0.0
-    mouth: str = "w"
     arm_L: float = 0.0
     arm_R: float = 0.0
     leg_L: float = 0.0
     leg_R: float = 0.0
-    tail: float = 0.0
     body_bob: float = 0.0
 
 
@@ -108,7 +103,7 @@ def ease_in_out(x):
 
 def idle_pose(t):
     breath = (math.sin(t * 2.0) + 1) * 0.5
-    bob = math.sin(t * 2.0) * 0.008
+    bob = math.sin(t * 2.0) * 1.5
     cycle = t % 3.6
     if cycle < 0.09:
         blink = ease_in_out(cycle / 0.09)
@@ -117,207 +112,281 @@ def idle_pose(t):
     else:
         blink = 0.0
     et = t % 5.5
-    ear_L = (math.sin(ease_in_out((et - 1.5) / 0.25) * math.pi) * 0.22
-             if 1.5 < et < 1.75 else math.sin(t * 1.3) * 0.02)
-    ear_R = (math.sin(ease_in_out((et - 3.6) / 0.25) * math.pi) * 0.2
-             if 3.6 < et < 3.85 else math.sin(t * 1.5 + 1) * 0.02)
+    ear_L = math.sin(ease_in_out((et - 1.5) / 0.25) * math.pi) * 0.12 if 1.5 < et < 1.75 else math.sin(t * 1.3) * 0.02
+    ear_R = math.sin(ease_in_out((et - 3.6) / 0.25) * math.pi) * 0.10 if 3.6 < et < 3.85 else math.sin(t * 1.5 + 1) * 0.02
     return CatPose(
-        breath=breath, head_tilt=math.sin(t * 0.7) * 0.035,
-        ear_L=ear_L, ear_R=ear_R, blink=blink, mouth="w",
-        arm_L=0.04 + math.sin(t * 1.4) * 0.05,
-        arm_R=-0.04 + math.cos(t * 1.5) * 0.05,
-        leg_L=0.02, leg_R=-0.02,
-        tail=math.sin(t * 2.1) * 0.3,
-        body_bob=bob,
+        breath=breath, head_tilt=math.sin(t * 0.7) * 0.03,
+        ear_L=ear_L, ear_R=ear_R, blink=blink,
+        arm_L=0.04 + math.sin(t * 1.4) * 0.03, arm_R=-0.04 + math.cos(t * 1.5) * 0.03,
+        leg_L=0.02, leg_R=-0.02, body_bob=bob,
     )
 
 
 def walk_pose(t, speed=2.8):
     phase = t * speed
     swing = math.sin(phase)
-    bob = (abs(math.sin(phase)) ** 1.35) * 0.026
+    bob = (abs(math.sin(phase)) ** 1.35) * 4.0
     return CatPose(
-        breath=(math.sin(t * 3.5) + 1) * 0.5,
-        head_tilt=math.sin(phase * 0.5) * 0.03,
-        ear_L=swing * 0.07, ear_R=-swing * 0.07,
-        blink=0.0, mouth="w",
-        arm_L=swing * 0.5, arm_R=-swing * 0.5,
-        leg_L=swing * 0.45, leg_R=-swing * 0.45,
-        tail=math.sin(phase * 1.1) * 0.35,
-        body_bob=bob,
+        breath=(math.sin(t * 3.5) + 1) * 0.5, head_tilt=math.sin(phase * 0.5) * 0.02,
+        ear_L=swing * 0.06, ear_R=-swing * 0.06, blink=0.0,
+        arm_L=swing * 0.28, arm_R=-swing * 0.28,
+        leg_L=swing * 0.22, leg_R=-swing * 0.22, body_bob=bob,
     )
 
 
-def render_cat(size=800, pose=None, bg=(236, 224, 240)):
+def rot(x, y, ang, ox, oy):
+    ca, sa = math.cos(ang), math.sin(ang)
+    dx, dy = x - ox, y - oy
+    return ox + dx * ca - dy * sa, oy + dx * sa + dy * ca
+
+
+def paint_shape(layer, pts, fill, outline, lw):
+    """Filled silhouette + thick rounded outline (dilate ring)."""
+    if len(pts) < 3:
+        return
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    pad = int(lw) + 6
+    x0 = max(0, int(min(xs)) - pad)
+    y0 = max(0, int(min(ys)) - pad)
+    x1 = min(layer.width, int(max(xs)) + pad + 1)
+    y1 = min(layer.height, int(max(ys)) + pad + 1)
+    bw, bh = max(1, x1 - x0), max(1, y1 - y0)
+    local = np.array([(p[0] - x0, p[1] - y0) for p in pts], np.int32)
+    mask = np.zeros((bh, bw), np.uint8)
+    cv2.fillPoly(mask, [local], 255)
+    # slight breath scale already applied to pts; soft edge
+    mask = cv2.GaussianBlur(mask, (3, 3), 0)
+    _, mask = cv2.threshold(mask, 100, 255, cv2.THRESH_BINARY)
+    if outline and lw > 0:
+        rad = max(1, int(round(lw)))
+        ker = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (rad * 2 + 1, rad * 2 + 1))
+        ring = cv2.subtract(cv2.dilate(mask, ker), mask)
+        ol = np.zeros((bh, bw, 4), np.uint8)
+        ol[ring > 0] = (*outline, 255)
+        layer.alpha_composite(Image.fromarray(ol, "RGBA"), (x0, y0))
+    if fill is not None:
+        fl = np.zeros((bh, bw, 4), np.uint8)
+        fc = fill if len(fill) == 4 else (*fill, 255)
+        fl[mask > 0] = fc
+        layer.alpha_composite(Image.fromarray(fl, "RGBA"), (x0, y0))
+
+
+def paint_poly_stroke(layer, pts, outline, lw, closed=True):
+    """Stroke centerline with round caps (matches hand-ink look)."""
+    if len(pts) < 2:
+        return
+    d = ImageDraw.Draw(layer)
+    seq = list(pts) + ([pts[0]] if closed else [])
+    d.line(seq, fill=(*outline, 255), width=max(1, int(round(lw))), joint="curve")
+    r = max(1, int(round(lw / 2)))
+    for p in pts:
+        d.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=(*outline, 255))
+
+
+def paint_stroke(layer, p0, p1, outline, lw):
+    d = ImageDraw.Draw(layer)
+    d.line([p0, p1], fill=(*outline, 255), width=max(1, int(round(lw))))
+    r = max(1, int(round(lw / 2)))
+    for p in (p0, p1):
+        d.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=(*outline, 255))
+
+
+def deform_body(pts, pose: CatPose, bob: float):
+    """Bob + arm/leg squash via local warps on integrated nubs/feet."""
+    out = []
+    for x, y in pts:
+        y = y + bob
+        # arm nubs: points past sides around arm height
+        if 455 < y - bob < 545:
+            if x > BODY_CX + 90:
+                # right arm — swing
+                x, y = rot(x, y, pose.arm_R * 0.35, BODY_CX + 140, 500 + bob)
+                x += pose.arm_R * 6
+            elif x < BODY_CX - 90:
+                x, y = rot(x, y, pose.arm_L * 0.35, BODY_CX - 140, 500 + bob)
+                x += pose.arm_L * 6
+        # feet
+        if y > NOTCH_Y + bob - 4:
+            if x < BODY_CX:
+                x, y = rot(x, y, pose.leg_L * 0.35, FOOT_L_X, FOOT_Y + bob)
+            else:
+                x, y = rot(x, y, pose.leg_R * 0.35, FOOT_R_X, FOOT_Y + bob)
+        # breath: slight width
+        x = BODY_CX + (x - BODY_CX) * (1 + pose.breath * 0.012)
+        out.append((x, y))
+    return out
+
+
+def render_cat_ref(pose=None, transparent=False, bg=BG):
     pose = pose or CatPose()
-    char_h = size * 0.76
-    head_h = char_h * 0.60
-    head_w = head_h * 1.38
-    S = head_w
-    lw = max(2.6, S * 0.038)
-
-    base = Image.new("RGBA", (size, size), (*bg, 255))
+    lw = STROKE
+    size = int(REF)
+    base = Image.new("RGBA", (size, size), (0, 0, 0, 0) if transparent else (*bg, 255))
     layer = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-
-    cx = size * 0.5
-    top = (size - char_h) / 2 + size * 0.015
-    head_cy = top + head_h * 0.50 + pose.body_bob * S
-    head_cx = cx
-    body_w = S * 0.40
-    body_h = S * 0.34 * (1 + pose.breath * 0.022)
-    body_cy = head_cy + head_h * 0.38
+    bob = pose.body_bob
     ht = pose.head_tilt
 
-    # TAIL curled up behind
-    t0x = cx - body_w * 0.08
-    t0y = body_cy + body_h * 0.08
-    centers, radii = [], []
-    for i in range(18):
-        u = i / 17
-        ang = math.pi * 0.75 + u * (math.pi * 1.2 + pose.tail * 0.3)
-        rad = S * (0.05 + u * 0.40)
-        centers.append((t0x + math.cos(ang) * rad, t0y - math.sin(ang) * rad * 0.98))
-        radii.append(S * (0.088 - u * 0.018))
-    left, right = [], []
-    for i, ((tx, ty), rr) in enumerate(zip(centers, radii)):
-        if i == 0:
-            dx, dy = centers[1][0] - tx, centers[1][1] - ty
-        elif i == len(centers) - 1:
-            dx, dy = tx - centers[-2][0], ty - centers[-2][1]
-        else:
-            dx = centers[i + 1][0] - centers[i - 1][0]
-            dy = centers[i + 1][1] - centers[i - 1][1]
-        L = math.hypot(dx, dy) or 1
-        nx, ny = -dy / L, dx / L
-        left.append((tx + nx * rr, ty + ny * rr))
-        right.append((tx - nx * rr, ty - ny * rr))
-    tip = centers[-1]; tip_r = radii[-1]
-    dx = tip[0] - centers[-2][0]; dy = tip[1] - centers[-2][1]
-    L = math.hypot(dx, dy) or 1
-    ux, uy = dx / L, dy / L
-    tip_pts = [(tip[0] + math.cos(a) * (-uy) * tip_r + math.sin(a) * ux * tip_r,
-                tip[1] + math.cos(a) * ux * tip_r + math.sin(a) * uy * tip_r)
-               for a in (-math.pi / 2 + math.pi * k / 8 for k in range(9))]
-    paint_shape(layer, left + tip_pts + list(reversed(right)), FILL, OUTLINE, lw * 0.9)
-    for idx in (7, 11, 14):
-        tx, ty = centers[idx]; rr = radii[idx]
-        paint_ellipse(layer, tx, ty, rr * 0.65, rr * 0.26, (*STRIPE, 200), None, 0, amp=0.004, seed=idx)
+    def xf_head(x, y):
+        return rot(x, y + bob * 0.3, ht, HEAD_CX, HEAD_CY + bob * 0.3)
 
-    # LEGS
-    for side, ang in ((-1, pose.leg_L), (1, pose.leg_R)):
-        hx = cx + side * body_w * 0.32
-        hy = body_cy + body_h * 0.62
-        paw = rot(hx, hy + S * 0.07, ang * 0.7, hx, hy)
-        paint_ellipse(layer, paw[0], paw[1], S * 0.085, S * 0.07, FILL, OUTLINE, lw * 0.85, seed=4 + side)
+    # BODY (arms integrated as nubs — not detached ovals)
+    bpts = deform_body(body_path(), pose, bob)
+    # Fill white body then stroke outline for clean ink look
+    paint_shape(layer, bpts, FILL, None, 0)
+    paint_poly_stroke(layer, bpts, OUTLINE, lw, closed=True)
 
-    paint_shape(layer, body_pts(cx, body_cy, body_w, body_h), FILL, OUTLINE, lw)
-
-    for side, ang in ((-1, pose.arm_L), (1, pose.arm_R)):
-        ax = cx + side * body_w * 0.36
-        ay = body_cy + body_h * 0.08
-        paw = rot(ax, ay + S * 0.08, ang, ax, ay)
-        paint_ellipse(layer, paw[0], paw[1], S * 0.09, S * 0.08, FILL, OUTLINE, lw * 0.85, seed=7 + side)
-
-    def draw_ear(side, twitch):
-        bx = head_cx + side * head_w * 0.33
-        by = head_cy - head_h * 0.34
-        tip = rot(bx + side * S * 0.015, by - S * 0.16, twitch + side * 0.02, bx, by)
-        p0 = (bx - side * S * 0.105, by + S * 0.045)
-        p2 = (bx + side * S * 0.095, by + S * 0.05)
-        m01 = ((p0[0] + tip[0]) / 2 - side * S * 0.02, (p0[1] + tip[1]) / 2 - S * 0.02)
-        m12 = ((tip[0] + p2[0]) / 2 + side * S * 0.02, (tip[1] + p2[1]) / 2 - S * 0.02)
-        # round tip with small arc
-        tip_arc = []
-        for k in range(6):
-            a = math.pi * 0.15 + math.pi * 0.7 * k / 5
-            tip_arc.append((tip[0] + math.cos(a - math.pi / 2) * S * 0.04 * side * 0.3,
-                            tip[1] + math.sin(a - math.pi / 2) * S * 0.035 - S * 0.01))
-        pts_local = [p0, m01] + tip_arc + [m12, p2]
-        pts = [rot(x, y, ht, head_cx, head_cy) for x, y in pts_local]
-        paint_shape(layer, pts, FILL, OUTLINE, lw)
-        ix = sum(p[0] for p in pts) / len(pts)
-        iy = sum(p[1] for p in pts) / len(pts) + S * 0.012
-        inner = [(ix - side * S * 0.032, iy + S * 0.032),
-                 (ix, iy - S * 0.055),
-                 (ix + side * S * 0.034, iy + S * 0.03)]
-        inn = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        ImageDraw.Draw(inn).polygon(inner, fill=(*INNER_EAR, 255))
-        layer.alpha_composite(inn)
-
-    draw_ear(-1, pose.ear_L)
-    draw_ear(1, pose.ear_R)
-
-    hpts = head_bun_pts(head_cx, head_cy, head_w * 0.5, head_h * 0.5, amp=0.006, seed=0.3)
-    hpts = [rot(x, y, ht, head_cx, head_cy) for x, y in hpts]
-    paint_shape(layer, hpts, FILL, OUTLINE, lw)
+    # HEAD+EARS (single continuous outline)
+    hpts = [xf_head(x, y) for x, y in head_path(pose.ear_L, pose.ear_R)]
+    # slight breath on head
+    hpts = [
+        (HEAD_CX + (x - HEAD_CX) * (1 + pose.breath * 0.008),
+         HEAD_CY + bob * 0.3 + (y - HEAD_CY - bob * 0.3) * (1 + pose.breath * 0.006))
+        for x, y in hpts
+    ]
+    paint_shape(layer, hpts, FILL, None, 0)
+    paint_poly_stroke(layer, hpts, OUTLINE, lw, closed=True)
 
     d = ImageDraw.Draw(layer)
-    for dy in (-0.12, -0.055, 0.01):
-        sx, sy = rot(head_cx - S * 0.015, head_cy + head_h * (dy - 0.12), ht, head_cx, head_cy)
-        hw = S * 0.06
-        d.arc([sx - hw, sy - S * 0.02, sx + hw, sy + S * 0.028], 205, 335,
-              fill=STRIPE, width=max(2, int(lw * 0.38)))
 
-    for side in (-1, 1):
-        ex, ey = rot(head_cx + side * head_w * 0.30, head_cy + head_h * 0.10, ht, head_cx, head_cy)
-        if pose.blink > 0.55:
-            span = S * 0.04
-            d.line([(ex, ey - span * 0.15), (ex + side * span * 0.75, ey + span * 0.08),
-                    (ex, ey + span * 0.32)], fill=OUTLINE, width=max(2, int(lw * 0.5)))
-        else:
-            rx, ry = S * 0.032, S * 0.033 * max(0.1, 1 - pose.blink)
-            d.ellipse([ex - rx, ey - ry, ex + rx, ey + ry], fill=OUTLINE)
+    # STRIPES — thick rounded grey bars top-center forehead
+    for s in STRIPES:
+        sx, sy = s["c"]
+        h, w, slant = s["h"], s["w"], s["slant"]
+        x0, y0 = xf_head(sx - slant * h / 2, sy - h / 2)
+        x1, y1 = xf_head(sx + slant * h / 2, sy + h / 2)
+        steps = 12
+        for k in range(steps + 1):
+            t = k / steps
+            px = x0 * (1 - t) + x1 * t
+            py = y0 * (1 - t) + y1 * t
+            rr = w * 0.55
+            d.ellipse([px - rr, py - rr * 0.92, px + rr, py + rr * 0.92], fill=(*STRIPE, 255))
 
+    # BLUSH outside eyes at cheek edges (under eyes)
     bl = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    for side in (-1, 1):
-        bx, by = rot(head_cx + side * head_w * 0.33, head_cy + head_h * 0.24, ht, head_cx, head_cy)
-        paint_ellipse(bl, bx, by, S * 0.07, S * 0.05, (*BLUSH, 205), None, 0, amp=0.004, seed=20 + side)
-    bl = bl.filter(ImageFilter.GaussianBlur(radius=max(0.5, S * 0.005)))
+    for (bx, by) in (BLUSH_L, BLUSH_R):
+        x, y = xf_head(bx, by)
+        paint_shape(
+            bl,
+            [
+                (x + math.cos(a) * BLUSH_R_PX, y + math.sin(a) * BLUSH_R_PX * 0.95)
+                for a in (i / 24 * math.pi * 2 for i in range(24))
+            ],
+            (*BLUSH, 235),
+            None,
+            0,
+        )
+    bl = bl.filter(ImageFilter.GaussianBlur(radius=1.2))
     layer.alpha_composite(bl)
     d = ImageDraw.Draw(layer)
 
-    mx, my = rot(head_cx, head_cy + head_h * 0.22, ht, head_cx, head_cy)
-    mw, mh = S * 0.042, S * 0.028
-    wline = max(2, int(lw * 0.36))
-    for cx_ in (mx - mw * 0.48, mx + mw * 0.48):
-        pts = [(cx_ + math.cos(math.pi + math.pi * k / 7) * mw * 0.48,
-                my + math.sin(math.pi + math.pi * k / 7) * mh) for k in range(8)]
+    # EYES on top of blush
+    for (ex, ey) in (EYE_L, EYE_R):
+        x, y = xf_head(ex, ey)
+        if pose.blink > 0.55:
+            d.line([(x - EYE_R_PX, y), (x + EYE_R_PX, y)], fill=(*OUTLINE, 255), width=max(3, int(lw * 0.5)))
+        else:
+            rr = EYE_R_PX * max(0.15, 1 - pose.blink)
+            d.ellipse([x - rr, y - rr, x + rr, y + rr], fill=(*OUTLINE, 255))
+
+    # ω mouth mid-head
+    mx, my = xf_head(*MOUTH_C)
+    mw, mh = MOUTH_W, MOUTH_W * 0.38
+    wline = max(3, int(lw * 0.65))
+    for cx_ in (mx - mw * 0.28, mx + mw * 0.28):
+        pts = [
+            (cx_ + math.cos(math.pi * k / 10) * mw * 0.28, my + math.sin(math.pi * k / 10) * mh)
+            for k in range(11)
+        ]
         for i in range(len(pts) - 1):
-            d.line([pts[i], pts[i + 1]], fill=OUTLINE, width=wline)
+            d.line([pts[i], pts[i + 1]], fill=(*OUTLINE, 255), width=wline)
+        # round caps
+        r = max(1, wline // 2)
+        for p in (pts[0], pts[-1]):
+            d.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=(*OUTLINE, 255))
 
-    for side in (-1, 1):
-        for j, dy in enumerate((0.05, 0.14)):
-            x0, y0 = rot(head_cx + side * head_w * 0.48, head_cy + head_h * dy, ht, head_cx, head_cy)
-            d.line([(x0, y0), (x0 + side * S * 0.10, y0 + (j - 0.5) * S * 0.012)],
-                   fill=OUTLINE, width=max(2, int(lw * 0.26)))
+    # WHISKERS — 2 thick per side
+    for x0, y0, x1, y1 in list(WHISK_L) + list(WHISK_R):
+        paint_stroke(layer, xf_head(x0, y0), xf_head(x1, y1), OUTLINE, lw * 0.9)
 
-    return Image.alpha_composite(base, layer).convert("RGB")
+    out = Image.alpha_composite(base, layer)
+    return out if transparent else out.convert("RGB")
 
 
-def make_gif(path, size=800, fps=12):
+def render_cat(size=800, pose=None, bg=BG, transparent=False):
+    img = render_cat_ref(pose=pose, transparent=True, bg=bg)
+    scaled = img.resize((size, size), Image.LANCZOS)
+    if transparent:
+        return scaled
+    base = Image.new("RGB", (size, size), bg)
+    base.paste(scaled, (0, 0), scaled)
+    return base
+
+
+def make_overlay(out_path="/workspace/bday/cat_compare.png", size=520):
+    ref = Image.open("/workspace/bday/refs/cat_main.jpg").convert("RGB")
+    cat = render_cat_ref(CatPose(), transparent=True)
+    overlay = Image.new("RGBA", ref.size, (255, 255, 255, 255))
+    overlay.paste(ref, (0, 0))
+    ca = cat.copy()
+    ca.putalpha(ca.split()[-1].point(lambda p: int(p * 0.50)))
+    overlay.alpha_composite(ca)
+
+    ours = render_cat_ref(CatPose(), transparent=False, bg=(255, 255, 255))
+
+    def fit(im):
+        im = im.convert("RGB")
+        im.thumbnail((size, size), Image.LANCZOS)
+        box = Image.new("RGB", (size, size), (255, 255, 255))
+        box.paste(im, ((size - im.width) // 2, (size - im.height) // 2))
+        return box
+
+    strip = Image.new("RGB", (size * 3 + 60, size + 78), (30, 28, 34))
+    strip.paste(fit(ref), (15, 42))
+    strip.paste(fit(overlay.convert("RGB")), (size + 30, 42))
+    strip.paste(fit(ours), (size * 2 + 45, 42))
+    dd = ImageDraw.Draw(strip)
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+    dd.text((20, 12), "reference (cat_main)", fill=(255, 230, 210), font=font)
+    dd.text((size + 35, 12), "overlay 50%", fill=(255, 230, 210), font=font)
+    dd.text((size * 2 + 50, 12), "vector base", fill=(255, 230, 210), font=font)
+    dd.text(
+        (20, size + 50),
+        f"traced geom stroke={STROKE:.0f}px ears=(247,163)/(513,165) eyes=({EYE_L[0]:.0f},{EYE_L[1]:.0f})-({EYE_R[0]:.0f},{EYE_R[1]:.0f})",
+        fill=(180, 170, 190),
+        font=font,
+    )
+    strip.save(out_path, quality=95)
+    overlay.convert("RGB").save("/workspace/bday/cat/measure/overlay_1to1.png")
+    # ink diff for QA
+    ref_a = np.array(ref.convert("L"))
+    ours_a = np.array(ours.convert("L"))
+    ref_ink = ref_a < 100
+    ours_ink = ours_a < 100
+    diff = np.zeros((*ref_a.shape, 3), np.uint8)
+    diff[:] = 255
+    diff[ref_ink & ~ours_ink] = (40, 200, 80)   # ref only = green
+    diff[ours_ink & ~ref_ink] = (220, 60, 60)   # ours only = red
+    diff[ref_ink & ours_ink] = (30, 30, 30)     # match = black
+    Image.fromarray(diff).save("/workspace/bday/cat/measure/ink_diff.png")
+    return out_path
+
+
+def make_gif(path, size=900, fps=12):
     frames = [render_cat(size, idle_pose(i / fps)) for i in range(int(3.0 * fps))]
     frames += [render_cat(size, walk_pose(i / fps)) for i in range(int(2.4 * fps))]
     frames[0].save(path, save_all=True, append_images=frames[1:], duration=int(1000 / fps), loop=0)
     return len(frames)
 
 
-def make_compare(ref_path, out_path, size=480):
-    ref = Image.open(ref_path).convert("RGB")
-    ours = render_cat(size, CatPose(arm_L=0.08, arm_R=-0.04, tail=0.05), bg=(198, 172, 208))
-    ref_fit = Image.new("RGB", (size, size), (198, 172, 208))
-    r = ref.copy(); r.thumbnail((int(size * 0.92), int(size * 0.92)), Image.LANCZOS)
-    ref_fit.paste(r, ((size - r.width) // 2, (size - r.height) // 2))
-    canvas = Image.new("RGB", (size * 2 + 50, size + 72), (30, 22, 38))
-    canvas.paste(ref_fit, (18, 42)); canvas.paste(ours, (size + 32, 42))
-    d = ImageDraw.Draw(canvas)
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 18)
-    d.text((22, 12), "reference", fill=(255, 230, 210), font=font)
-    d.text((size + 36, 12), "vector base", fill=(255, 230, 210), font=font)
-    canvas.save(out_path, quality=95)
+def main():
+    root = Path("/workspace/bday")
+    n = make_gif(root / "cat_base.gif", 900, 12)
+    make_overlay(str(root / "cat_compare.png"), 520)
+    render_cat(1200, idle_pose(0.2)).save(root / "cat/cat_still.png")
+    print("gif_frames", n)
 
 
 if __name__ == "__main__":
-    root = "/workspace/bday"
-    print("gif", make_gif(f"{root}/cat_base.gif", 800, 12))
-    make_compare(f"{root}/cat/ref_waiter_tight.png", f"{root}/cat_compare.png")
-    render_cat(800, idle_pose(0.35)).save(f"{root}/cat/cat_still.png")
+    main()
