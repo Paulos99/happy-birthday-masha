@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Сцена — день рождения Маши</title>
+<style>
+  @font-face{font-family:'Marck Script';src:url('fonts/MarckScript-Regular.ttf');font-display:block}
+  @font-face{font-family:'Caveat';src:url('fonts/Caveat-Bold.ttf');font-weight:700;font-display:block}
+  html,body{margin:0;height:100%;background:#1a1028;overflow:hidden}
+  body.hide-cursor{cursor:none}
+  #stage{position:fixed;left:50%;top:50%;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#2a1c44}
+  #stage svg,#stage canvas{position:absolute;left:0;top:0;width:1920px;height:1080px;display:block}
+  #fsBtn{position:fixed;right:18px;bottom:18px;z-index:40;border:0;border-radius:999px;padding:12px 18px;
+    background:rgba(40,24,50,.72);color:#ffe8d4;font:700 14px system-ui,sans-serif;cursor:pointer;
+    opacity:0;transition:opacity .3s;backdrop-filter:blur(6px);box-shadow:0 4px 18px rgba(0,0,0,.35)}
+  #fsBtn.visible{opacity:1}
+  /* лёгкое мерцание */
+  .tw{animation:tw 3.2s ease-in-out infinite}
+  @keyframes tw{0%,100%{opacity:.25}50%{opacity:1}}
+  .tw2{animation:tw 4.7s ease-in-out infinite}
+  .gl{animation:gl 2.6s ease-in-out infinite}
+  @keyframes gl{0%,100%{opacity:.45}50%{opacity:.95}}
+</style>
+</head>
+<body>
+<div id="stage"><svg id="svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg><canvas id="snow" width="1920" height="1080"></canvas></div>
+<button id="fsBtn" type="button">⛶ На весь экран</button>
+<script src="config.js"></script>
+<script src="photos.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>

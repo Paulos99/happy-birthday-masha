@@ -1,6 +1,2 @@
-shot*.png
-shot.png
-overlap_report.json
-cat-lab/
-refs/
-*.log
+_t/
+scene_shot.png
