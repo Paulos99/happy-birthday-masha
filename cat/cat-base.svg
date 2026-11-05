@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="200" height="240" fill="none">
+  <defs>
+    <style>
+      .ol{stroke:#261e1c;stroke-width:3.2;stroke-linejoin:round;stroke-linecap:round;fill:#fffcf8}
+      .stripe{fill:#9b969b;opacity:.75}
+      .blush{fill:#ffa8ac;opacity:.55}
+      .inner{fill:#ffbcc0}
+      .eye{fill:#261e1c}
+      .line{stroke:#261e1c;stroke-width:2;stroke-linecap:round;fill:none}
+    </style>
+  </defs>
+  <g id="cat-base" transform="translate(100,210)">
+    <g id="tail" data-pivot="-12,-78">
+      <path class="ol" d="M-18,-72 C-48,-95 -78,-88 -90,-62 C-96,-50 -90,-40 -78,-38 C-55,-36 -35,-55 -20,-65 Z"/>
+      <ellipse class="stripe" cx="-58" cy="-62" rx="7" ry="3.2" transform="rotate(-35 -58 -62)"/>
+      <ellipse class="stripe" cx="-72" cy="-52" rx="6" ry="2.8" transform="rotate(-25 -72 -52)"/>
+    </g>
+    <g id="leg-L" data-pivot="-18,-35"><ellipse class="ol" cx="-18" cy="-12" rx="12" ry="11"/></g>
+    <g id="leg-R" data-pivot="18,-35"><ellipse class="ol" cx="18" cy="-12" rx="12" ry="11"/></g>
+    <g id="body" data-pivot="0,-70"><ellipse class="ol" cx="0" cy="-70" rx="42" ry="38"/></g>
+    <g id="arm-L" data-pivot="-40,-75"><ellipse class="ol" cx="-50" cy="-58" rx="12" ry="11"/></g>
+    <g id="arm-R" data-pivot="40,-75"><ellipse class="ol" cx="50" cy="-58" rx="12" ry="11"/></g>
+    <g id="head" data-pivot="0,-125">
+      <g id="ear-L" data-pivot="-38,-155">
+        <path class="ol" d="M-48,-148 L-40,-172 L-28,-146 Z"/>
+        <path class="inner" d="M-44,-150 L-39,-162 L-34,-149 Z"/>
+      </g>
+      <g id="ear-R" data-pivot="38,-155">
+        <path class="ol" d="M28,-146 L40,-172 L48,-148 Z"/>
+        <path class="inner" d="M34,-149 L39,-162 L44,-150 Z"/>
+      </g>
+      <ellipse class="ol" cx="0" cy="-130" rx="58" ry="44"/>
+      <g id="stripes">
+        <ellipse class="stripe" cx="-10" cy="-148" rx="3.2" ry="9"/>
+        <ellipse class="stripe" cx="0" cy="-150" rx="3.6" ry="11"/>
+        <ellipse class="stripe" cx="10" cy="-148" rx="3.2" ry="9"/>
+      </g>
+      <g id="eyes">
+        <circle class="eye" id="eye-L" cx="-22" cy="-128" r="5"/>
+        <circle class="eye" id="eye-R" cx="22" cy="-128" r="5"/>
+      </g>
+      <g id="blush">
+        <ellipse class="blush" cx="-34" cy="-116" rx="10" ry="7"/>
+        <ellipse class="blush" cx="34" cy="-116" rx="10" ry="7"/>
+      </g>
+      <g id="mouth" class="line">
+        <path d="M-10,-108 A6,5 0 0 0 0,-108"/>
+        <path d="M0,-108 A6,5 0 0 0 10,-108"/>
+      </g>
+      <g id="whiskers" class="line">
+        <path d="M-48,-130 H-62"/><path d="M-48,-122 H-64"/><path d="M-48,-114 H-61"/>
+        <path d="M48,-130 H62"/><path d="M48,-122 H64"/><path d="M48,-114 H61"/>
+      </g>
+    </g>
+  </g>
+</svg>
