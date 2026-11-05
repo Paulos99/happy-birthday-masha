@@ -741,7 +741,9 @@ const GREETINGS = [
         ph.photoPlaceholder = photoIdx;
         ph.photoCaption = ['Для тебя','Маша ♥','Наш вечер','24'][photoIdx % 4];
         ph.showPhoto = false;
-        ph.x = -100; ph.y = H*0.70; ph.facing = 1;
+        // start just off-screen and walk briskly so the polaroid is on stage ~3s later
+        ph.x = -60; ph.y = H*0.68; ph.facing = 1;
+        ph.walkSpeed = 11;
         ph.state = 'walk'; ph.targetX = W*0.50; ph.task = 'showPhoto';
       }
     }
@@ -841,6 +843,7 @@ const GREETINGS = [
         c.y = H*0.70 + Math.sin(t*2)*1.5;
         if (c.timer > 9){
           c.showPhoto = false;
+          c.walkSpeed = 10;
           c.state = 'walk';
           c.targetX = W + 120;
           c.facing = 1;
