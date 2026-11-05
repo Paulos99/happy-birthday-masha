@@ -764,7 +764,7 @@ window.SCENE_ANCHORS={
   painter:     {x:402, y:680, scale:1.1,  flip:false, layer:'front', brush:'Scene.paint.tip() — текущая точка кисти на холсте'},
   waiterA:     {x:170, y:860, scale:1.0,  flip:false, layer:'front'},
   waiterB:     {x:408, y:892, scale:1.0,  flip:false, layer:'front'},
-  compliment:  {x:640, y:622, scale:1.0,  flip:false, layer:'back', bubble:{x:520,y:372}},
+  compliment:  {x:560, y:622, scale:1.0,  flip:false, layer:'back', bubble:{x:440,y:372}},
   dancer:      {x:560, y:1000,scale:1.0,  flip:false, layer:'front'},
   lamplighter: {x:LAD.cx, y:LAD.top+2, scale:.9, flip:false, layer:'back', note:'стоит на верхней площадке стремянки; свечи — см. candles'},
   photographer:{x:1590,y:846, scale:1.0,  flip:true,  layer:'front', lookAt:{x:1760,y:420}},
