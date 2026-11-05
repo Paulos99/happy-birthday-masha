@@ -6,7 +6,7 @@ window.BDAY = {
   age: 24,
   dateLine: '05.11.2002 — 05.11.2026',
   title: 'С днём рождения, Маша!',
-  polaroidCaption: 'Пусть мечты сбываются! ❤️',
+  polaroidCaption: 'Мечтай! ❤️',
 
   wine: 'Хванчкара',
   chairs: { left: 'Паша', right: 'Маша ❤️' },
